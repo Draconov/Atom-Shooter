@@ -1,0 +1,40 @@
+{
+  "name": "atom-shooter-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Clean-room web and Windows recreation of Atom Shooter",
+  "author": "Draconov",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win portable",
+    "dist:win:installer": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "io.github.draconov.atomshooter",
+    "productName": "Atom Shooter",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "web/**/*",
+      "electron/**/*",
+      "build/icon.png"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "Atom-Shooter-${version}.exe"
+    }
+  },
+  "type": "module"
+}

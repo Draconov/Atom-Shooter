@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#eef3f5" />
+  <title>Atom Shooter</title>
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="app" class="app-shell" aria-live="polite">
+    <section id="screen-main" class="screen active" data-screen="main">
+      <div class="menu-card hero-card">
+        <div class="atom-logo" aria-hidden="true">
+          <span class="orbit o1"></span><span class="orbit o2"></span><span class="orbit o3"></span>
+          <span class="logo-core"></span><span class="logo-ship">▲</span>
+        </div>
+        <p class="eyebrow">CLEAN-ROOM WEB RECREATION</p>
+        <h1>ATOM SHOOTER</h1>
+        <p class="tagline">Asteroids meets the periodic table.</p>
+        <div class="main-actions">
+          <button class="primary huge" data-action="classic"><span>▶</span> Classic</button>
+          <button data-action="marathon"><span>∞</span> Marathon</button>
+          <button data-action="tutorial"><span>?</span> Tutorial</button>
+        </div>
+        <div class="secondary-actions">
+          <button data-action="shop">Shop</button>
+          <button data-action="options">Options</button>
+          <button data-action="about">About</button>
+        </div>
+        <p id="continue-hint" class="tiny muted"></p>
+      </div>
+    </section>
+
+    <section id="screen-table" class="screen" data-screen="table">
+      <header class="topbar">
+        <button class="icon-btn" data-action="home" aria-label="Back to menu">←</button>
+        <div><p class="eyebrow">CLASSIC</p><h2>Choose Element</h2></div>
+        <button class="wallet" data-action="shop"><span class="e-dot"></span><b id="table-electrons">0</b><span class="n-dot"></span><b id="table-neutrons">0</b></button>
+      </header>
+      <div class="table-wrap">
+        <div id="periodic-table" class="periodic-table" aria-label="Periodic table level selector"></div>
+      </div>
+      <div class="legend"><span><i class="state-dot done"></i>Completed</span><span><i class="state-dot open"></i>Available</span><span><i class="state-dot locked"></i>Locked</span></div>
+    </section>
+
+    <section id="screen-shop" class="screen" data-screen="shop">
+      <header class="topbar">
+        <button class="icon-btn" data-action="shop-back" aria-label="Back">←</button>
+        <div><p class="eyebrow">LOADOUT</p><h2>Shop</h2></div>
+        <div class="wallet static"><span class="e-dot"></span><b id="shop-electrons">0</b><span class="n-dot"></span><b id="shop-neutrons">0</b></div>
+      </header>
+      <nav id="shop-tabs" class="tabs" aria-label="Shop category">
+        <button class="active" data-tab="ships">Ships</button>
+        <button data-tab="weapons">Weapons</button>
+        <button data-tab="engines">Engines</button>
+        <button data-tab="modules">Modules</button>
+      </nav>
+      <div id="shop-grid" class="shop-grid"></div>
+      <aside id="loadout-panel" class="loadout-panel"></aside>
+    </section>
+
+    <section id="screen-options" class="screen" data-screen="options">
+      <header class="topbar">
+        <button class="icon-btn" data-action="home" aria-label="Back">←</button>
+        <div><p class="eyebrow">SETTINGS</p><h2>Options</h2></div><span></span>
+      </header>
+      <div class="settings-card">
+        <label class="setting-row"><span><b>Sound effects</b><small>Shots, impacts and pickups</small></span><input id="setting-sfx" type="checkbox" /></label>
+        <label class="setting-row"><span><b>Ambient music</b><small>Minimal synthesized background tone</small></span><input id="setting-music" type="checkbox" /></label>
+        <label class="setting-row"><span><b>Joystick side</b><small>Swap mobile flight and fire controls</small></span><select id="setting-side"><option value="right">Right</option><option value="left">Left</option></select></label>
+        <label class="setting-row"><span><b>Joystick size</b><small>Virtual analog control size</small></span><select id="setting-stick"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+        <label class="setting-row"><span><b>Dead zone</b><small>How far the stick moves before thrust begins</small></span><input id="setting-deadzone" type="range" min="0.1" max="0.65" step="0.05" /></label>
+        <div class="settings-buttons"><button data-action="reset-tutorial">Reset tutorial</button><button class="danger" data-action="reset-save">Reset all progress</button></div>
+      </div>
+    </section>
+
+    <section id="screen-game" class="screen game-screen" data-screen="game">
+      <div class="game-topbar">
+        <button id="pause-btn" class="icon-btn light" aria-label="Pause">Ⅱ</button>
+        <div id="life-indicator" class="lives" aria-label="Lives"></div>
+        <div class="game-wallet"><span class="e-dot"></span><b id="game-electrons">0</b><span class="n-dot"></span><b id="game-neutrons">0</b></div>
+      </div>
+      <div id="game-stage" class="game-stage">
+        <canvas id="game-canvas" width="1000" height="1000" aria-label="Atom Shooter game field"></canvas>
+        <div id="objective" class="objective"></div>
+        <div id="tutorial-callout" class="tutorial-callout hidden"></div>
+        <div id="touch-controls" class="touch-controls" aria-label="Touch controls">
+          <div id="fire-control" class="fire-control"><span>FIRE</span></div>
+          <div id="joystick" class="joystick"><div id="joystick-knob" class="joystick-knob"></div></div>
+        </div>
+      </div>
+      <div class="game-bottom">
+        <div><span id="element-symbol" class="element-symbol">H</span><span id="element-name">Hydrogen</span></div>
+        <div><b id="score">0</b><small> SCORE</small></div>
+      </div>
+    </section>
+
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-card"><h2 id="modal-title"></h2><div id="modal-body"></div><div id="modal-actions" class="modal-actions"></div></div>
+    </div>
+    <div id="toast" class="toast hidden" role="status"></div>
+  </main>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
