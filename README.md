@@ -1,87 +1,234 @@
-# Atom Shooter
+<div align="center">
+  <img src="web/assets/icon-192.png" width="128" height="128" alt="Atom Shooter icon">
 
-A clean-room recreation of the classic **Atom Shooter** arcade concept, rebuilt for modern browsers and Windows.
+# ATOM SHOOTER
 
-- **GitHub Pages:** static HTML/CSS/JavaScript in `web/`
-- **Windows:** Electron wrapper around the exact same game
-- **118 element levels** laid out as the periodic table
-- Classic, Marathon and Tutorial modes
-- Inertia, thrust, nucleus gravity, electron shells and particle collection
-- Nucleus explosion: collect blue neutrons, avoid red protons
-- Six ships, weapons, engines and passive modules
-- Persistent local progress, currency, unlocks and best scores
-- Keyboard/mouse and touch controls
-- No original APK binaries, sprites, music or proprietary assets are included
+**Asteroids-style nano combat meets the periodic table.**  
+Strip electrons, crack the nucleus, collect neutrons, dodge protons, and upgrade your ship across all 118 elements.
+
+[![Play Web Version](https://img.shields.io/badge/PLAY-WEB%20VERSION-14a8b2?style=for-the-badge&logo=github)](https://draconov.github.io/Atom-Shooter/)
+[![Download Windows EXE](https://img.shields.io/badge/DOWNLOAD-WINDOWS%20EXE-ef355d?style=for-the-badge&logo=windows)](https://github.com/Draconov/Atom-Shooter/releases/latest/download/Atom-Shooter-Windows.exe)
+[![Latest Release](https://img.shields.io/github/v/release/Draconov/Atom-Shooter?style=for-the-badge&label=RELEASE)](https://github.com/Draconov/Atom-Shooter/releases/latest)
+
+[![Deploy GitHub Pages](https://github.com/Draconov/Atom-Shooter/actions/workflows/pages.yml/badge.svg)](https://github.com/Draconov/Atom-Shooter/actions/workflows/pages.yml)
+[![Build Windows EXE](https://github.com/Draconov/Atom-Shooter/actions/workflows/windows.yml/badge.svg)](https://github.com/Draconov/Atom-Shooter/actions/workflows/windows.yml)
+
+**Web • Windows • Keyboard/Mouse • Touch • 118 levels**
+</div>
+
+---
+
+## Play
+
+### 🌐 Web version
+
+Play directly in your browser:
+
+**https://draconov.github.io/Atom-Shooter/**
+
+No installation is required. Progress, purchases, settings, and high scores are stored locally in the browser.
+
+### 🪟 Windows version
+
+Download the latest portable Windows build:
+
+**https://github.com/Draconov/Atom-Shooter/releases/latest/download/Atom-Shooter-Windows.exe**
+
+The EXE uses the same game code as the web version, wrapped with Electron. No installer is required.
+
+---
+
+## The game
+
+You pilot a microscopic ship inside an atom. Every element is its own level.
+
+1. **Shoot orbiting electrons** out of their shells.
+2. **Collect loose electrons** to earn upgrade currency.
+3. When the electron shells are cleared, the **nucleus destabilizes and splits**.
+4. **Collect blue neutrons** before the particle field collapses.
+5. **Avoid red protons** — touching them costs lives.
+6. Spend collected particles on **ships, weapons, engines, and modules**.
+7. Continue through the periodic table from **Hydrogen to element 118**.
+
+The post-split collection window scales with difficulty: early elements give **60 seconds**, gradually falling to a **20 second minimum** for the hardest atoms.
+
+---
+
+## Features
+
+- 🧪 **118 periodic-table levels**
+- 🎮 **Classic, Marathon, and Tutorial** modes
+- 🚀 Asteroids-style **inertia, thrust, rotation, and nucleus gravity**
+- 🔵 Shoot and collect **electrons**
+- 💥 Dynamic **nucleus splitting**
+- 🔷 Collect **neutrons** while dodging 🔴 **protons**
+- ⏱️ Difficulty-scaled **60 → 20 second** post-split collection timer
+- 🛸 **Six visually distinct ships** with different hull shapes, colors, and surface patterns
+- 🔫 Multiple weapons, engines, and passive modules
+- 🛒 Upgrade/equipment shop
+- 🎵 Procedural Web Audio soundtrack and synthesized sound effects
+- 💾 Persistent local progress and high scores
+- ⌨️ Keyboard + mouse controls
+- 📱 Touch controls with configurable joystick side, size, and dead zone
+- 🌐 Static GitHub Pages build — no backend required
+- 🪟 Portable Windows EXE built from the same source
+
+---
 
 ## Controls
 
-Desktop:
+| Action | Keyboard / Mouse | Touch |
+|---|---|---|
+| Rotate / aim | `A` / `D`, `←` / `→`, mouse while firing | Analog stick |
+| Thrust | `W` / `↑` | Push analog stick past dead zone |
+| Reverse thrust | `S` / `↓` | — |
+| Fire | `Space` or left mouse button | **FIRE** button |
+| Pause | `Esc` | Pause button |
 
-- `W` / `↑` — thrust
-- `A` / `D` or `←` / `→` — rotate
-- `Space` — fire
-- Mouse — aim while firing
-- `Esc` — pause
+---
 
-Touch:
+## Ships & upgrades
 
-- Analog stick — aim; pull farther to engage thrust
-- FIRE button — shoot
+The ship roster is more than a stat swap. Each hull now has its own geometry and texture language:
 
-## Publish on GitHub Pages
+| Ship | Character |
+|---|---|
+| **Pico** | Minimal starter hull |
+| **Nano** | Central racing stripe |
+| **Falcon** | Chevron flight markings |
+| **Behemoth** | Heavy armor bands |
+| **Hawk** | Panelled tactical hull |
+| **Nano II** | High-tech grid pattern |
 
-This repository already contains `.github/workflows/pages.yml`.
+Weapons, engines, and passive modules can then change fire rate, projectile speed, pickup radius, gravity resistance, ship size, electron speed, and hostile-particle speed.
 
-1. Create a new GitHub repository under **Draconov**.
-2. Upload/push the contents of this repository to the `main` branch.
-3. Open **Settings → Pages** and make sure the source is **GitHub Actions**.
-4. Push to `main`. The Pages workflow publishes the `web/` folder.
+---
 
-Because all asset paths are relative, the game works both at `https://draconov.github.io/<repo>/` and in Electron without changing a base URL.
+## Audio
 
-## Build the Windows EXE
+Atom Shooter uses the browser's **Web Audio API** instead of shipping copied audio from the original Android game.
 
-Install Node.js 22+, then:
+The soundtrack starts after the first click/tap/key interaction because browsers intentionally block audio autoplay before user interaction. The music option is enabled by default for new saves and can be changed under **Options → Ambient music**.
+
+---
+
+## Repository layout
+
+```text
+Atom-Shooter/
+├─ web/
+│  ├─ index.html              # UI and game screens
+│  ├─ styles.css              # Responsive UI
+│  ├─ manifest.webmanifest    # Installable web metadata
+│  ├─ assets/                 # Web icons
+│  └─ src/
+│     ├─ app.js               # Menus, saves, shop, controls
+│     ├─ audio.js             # Web Audio music + SFX
+│     ├─ data.js              # Elements, ships, weapons, upgrades
+│     └─ game.js              # Physics, simulation, rendering, game loop
+├─ electron/
+│  └─ main.cjs                # Windows desktop shell
+├─ build/                     # Windows application icons
+├─ .github/workflows/
+│  ├─ pages.yml               # GitHub Pages deployment
+│  └─ windows.yml             # Windows build + GitHub Release
+├─ package.json
+└─ README.md
+```
+
+---
+
+## Development
+
+The browser build has no compile step. Serve the `web/` directory with any local static server:
+
+```bash
+npx serve web
+```
+
+Then open the local address printed by the server.
+
+To run the desktop wrapper:
+
+```bash
+npm install
+npm start
+```
+
+To build the portable Windows executable locally:
 
 ```bash
 npm install
 npm run dist:win
 ```
 
-The portable EXE is written to `dist/Atom-Shooter-1.0.0-Windows.exe`.
-
-You can also open **Actions → Build Windows EXE → Run workflow** on GitHub. The resulting EXE is attached as a workflow artifact. Pushing a tag such as `v1.0.0` also triggers the build **and attaches the EXE to that GitHub Release**.
-
-## Local browser test
-
-The web build has no compile step. Serve the `web/` folder with any static server, for example:
-
-```bash
-npx serve web
-```
-
-Then open the printed local address.
-
-## Project structure
+The versioned output is:
 
 ```text
-web/
-  index.html        UI/screens
-  styles.css        responsive visual design
-  src/data.js       elements, ships, shop data
-  src/game.js       canvas simulation + game loop
-  src/audio.js      synthesized SFX/ambient audio
-  src/app.js        menus, saves, shop, controls
-  assets/icon.svg
-electron/
-  main.cjs          Windows desktop shell
-.github/workflows/
-  pages.yml         GitHub Pages deployment
-  windows.yml       Windows EXE build
+dist/Atom-Shooter-1.1.0-Windows.exe
 ```
 
-## Attribution / scope
+---
 
-This repository is a newly written implementation based on publicly described gameplay behavior and inspection of a user-supplied historical APK for compatibility/reference. It does **not** contain the original APK, original image/audio resources, or recovered original source code.
+## GitHub Pages deployment
 
-“Atom Shooter” and the original game remain associated with their original creators/rightsholders. If you intend to publish this publicly under the original name or branding, verify that you have the necessary rights; otherwise rename the project before release.
+`.github/workflows/pages.yml` deploys the `web/` directory whenever `main` is updated.
+
+If Pages is not enabled yet, open:
+
+**Repository → Settings → Pages → Source → GitHub Actions**
+
+After that, pushes to `main` publish the game at:
+
+**https://draconov.github.io/Atom-Shooter/**
+
+---
+
+## Windows Releases
+
+`.github/workflows/windows.yml` builds the portable EXE on:
+
+- every push to `main`;
+- version tags such as `v1.1.0`;
+- manual **Run workflow** launches.
+
+The workflow uploads both:
+
+```text
+Atom-Shooter-1.1.0-Windows.exe
+Atom-Shooter-Windows.exe
+```
+
+It then creates or updates the matching GitHub Release and marks it as the latest release. The stable second filename is intentional, so this README can always use one permanent download URL:
+
+**https://github.com/Draconov/Atom-Shooter/releases/latest/download/Atom-Shooter-Windows.exe**
+
+The workflow has `contents: write`, validates that the EXE exists before publishing, and fails instead of creating an empty release when the build artifact is missing.
+
+---
+
+## Performance notes
+
+The game intentionally stays dependency-light. The v1.1 renderer/game-loop cleanup also:
+
+- pre-renders the static arena background once instead of rebuilding it every frame;
+- caches electron-shell radii instead of filtering and constructing a new `Set` during every draw;
+- tracks remaining orbiting electrons directly instead of scanning the whole electron list each frame;
+- suppresses unchanged HUD updates so the canvas loop does not rewrite DOM text 30–60 times per second;
+- caps transient visual particles during long sessions;
+- avoids running nuclear-particle logic before the nucleus actually splits;
+- pauses procedural music scheduling while the page is hidden.
+
+---
+
+## Project scope
+
+This repository is a newly written recreation based on the gameplay concept and compatibility/reference inspection of a user-supplied historical Android APK. It does **not** publish the original APK, recovered original source code, original music, or copied proprietary sprite resources.
+
+“Atom Shooter” and the historical game remain associated with their original creators/rightsholders. If this project is distributed publicly under the original name or branding, make sure you have the necessary rights to do so.
+
+---
+
+<div align="center">
+  <b>Built for modern browsers and Windows by Draconov.</b>
+</div>

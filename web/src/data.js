@@ -28,12 +28,12 @@ const POS = new Map(); for (const [row,cells] of ROWS) for (const [col,sym] of O
 for (const e of ELEMENTS) Object.assign(e,POS.get(e.symbol)||{row:1,col:1});
 
 export const SHIPS = [
- {id:'pico',name:'Pico',costE:0,costN:0,mass:.72,size:.78,thrust:1.15,slots:0,pickup:1,gravity:1,desc:'The first quantum-sized vessel: very light, low inertia and easy to fly.'},
- {id:'nano',name:'Nano',costE:40,costN:3,mass:.85,size:.86,thrust:1.1,slots:1,pickup:1.05,gravity:.95,desc:'Slightly larger than Pico, with one upgrade slot and reduced nucleus pull.'},
- {id:'falcon',name:'Falcon',costE:110,costN:10,mass:1.0,size:1,thrust:1.08,slots:2,pickup:1.12,gravity:.9,desc:'A fast all-rounder with room for meaningful customization.'},
- {id:'behemoth',name:'Behemoth',costE:220,costN:24,mass:1.35,size:1.22,thrust:.92,slots:3,pickup:1.35,gravity:.88,desc:'A large vessel: slower to change direction, but excellent at collecting particles.'},
- {id:'hawk',name:'Hawk',costE:420,costN:48,mass:1.18,size:1.08,thrust:1.18,slots:3,pickup:1.23,gravity:.8,desc:'A compromise between Behemoth size and nimble handling.'},
- {id:'nano2',name:'Nano II',costE:700,costN:90,mass:.76,size:.82,thrust:1.28,slots:4,pickup:1.5,gravity:.72,desc:'Second-generation Nano with a built-in electron pickup field.'}
+ {id:'pico',name:'Pico',costE:0,costN:0,mass:.72,size:.78,thrust:1.15,slots:0,pickup:1,gravity:1,visual:{hull:'#f9fcfd',accent:'#ef355d',detail:'#2e9ea7',outline:'#2e9ea7',canopy:'#34434a',pattern:'core'},desc:'The first quantum-sized vessel: very light, low inertia and easy to fly.'},
+ {id:'nano',name:'Nano',costE:40,costN:3,mass:.85,size:.86,thrust:1.1,slots:1,pickup:1.05,gravity:.95,visual:{hull:'#e9fbff',accent:'#14a8b2',detail:'#5b7680',outline:'#2b8f9b',canopy:'#173f4c',pattern:'stripe'},desc:'Slightly larger than Pico, with one upgrade slot and reduced nucleus pull.'},
+ {id:'falcon',name:'Falcon',costE:110,costN:10,mass:1.0,size:1,thrust:1.08,slots:2,pickup:1.12,gravity:.9,visual:{hull:'#fff8e7',accent:'#ef9d35',detail:'#94724c',outline:'#8b6d50',canopy:'#3d4a4f',pattern:'chevron'},desc:'A fast all-rounder with room for meaningful customization.'},
+ {id:'behemoth',name:'Behemoth',costE:220,costN:24,mass:1.35,size:1.22,thrust:.92,slots:3,pickup:1.35,gravity:.88,visual:{hull:'#e9edf0',accent:'#dc4b63',detail:'#68767e',outline:'#58666d',canopy:'#27383f',pattern:'armor'},desc:'A large vessel: slower to change direction, but excellent at collecting particles.'},
+ {id:'hawk',name:'Hawk',costE:420,costN:48,mass:1.18,size:1.08,thrust:1.18,slots:3,pickup:1.23,gravity:.8,visual:{hull:'#edf5eb',accent:'#4f9d69',detail:'#6d7f64',outline:'#4f7159',canopy:'#263e36',pattern:'panel'},desc:'A compromise between Behemoth size and nimble handling.'},
+ {id:'nano2',name:'Nano II',costE:700,costN:90,mass:.76,size:.82,thrust:1.28,slots:4,pickup:1.5,gravity:.72,visual:{hull:'#f1eeff',accent:'#7868d8',detail:'#4aa5b8',outline:'#655ba3',canopy:'#2d2b51',pattern:'grid'},desc:'Second-generation Nano with a built-in electron pickup field.'}
 ];
 export const WEAPONS = [
  {id:'blaster2',name:'Blaster 2000',costE:0,costN:0,rate:3.4,speed:650,life:1.0,bullets:2,spread:.035,size:5,damage:1,desc:'The first nano weapon. Fires a tight two-particle shot.'},

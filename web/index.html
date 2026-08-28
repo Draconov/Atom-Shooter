@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#eef3f5" />
   <title>Atom Shooter</title>
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="./assets/icon-192.png" sizes="192x192" type="image/png" />
+  <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+  <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -14,7 +17,7 @@
       <div class="menu-card hero-card">
         <div class="atom-logo" aria-hidden="true">
           <span class="orbit o1"></span><span class="orbit o2"></span><span class="orbit o3"></span>
-          <span class="logo-core"></span><span class="logo-ship">▲</span>
+          <span class="logo-core"></span><span class="logo-ship"></span>
         </div>
         <p class="eyebrow">CLEAN-ROOM WEB RECREATION</p>
         <h1>ATOM SHOOTER</h1>
@@ -68,7 +71,7 @@
       </header>
       <div class="settings-card">
         <label class="setting-row"><span><b>Sound effects</b><small>Shots, impacts and pickups</small></span><input id="setting-sfx" type="checkbox" /></label>
-        <label class="setting-row"><span><b>Ambient music</b><small>Minimal synthesized background tone</small></span><input id="setting-music" type="checkbox" /></label>
+        <label class="setting-row"><span><b>Ambient music</b><small>Procedural pulse soundtrack — starts after your first interaction</small></span><input id="setting-music" type="checkbox" /></label>
         <label class="setting-row"><span><b>Joystick side</b><small>Swap mobile flight and fire controls</small></span><select id="setting-side"><option value="right">Right</option><option value="left">Left</option></select></label>
         <label class="setting-row"><span><b>Joystick size</b><small>Virtual analog control size</small></span><select id="setting-stick"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
         <label class="setting-row"><span><b>Dead zone</b><small>How far the stick moves before thrust begins</small></span><input id="setting-deadzone" type="range" min="0.1" max="0.65" step="0.05" /></label>

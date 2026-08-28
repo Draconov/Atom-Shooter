@@ -1,28 +1,80 @@
 name: Build Windows EXE
+
 on:
-  workflow_dispatch:
   push:
+    branches: [main]
     tags: ['v*']
+  workflow_dispatch:
+
 permissions:
   contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
-      - run: npm run dist:win
-      - uses: actions/upload-artifact@v4
+
+      - name: Read version
+        id: meta
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run smoke checks
+        run: npm test
+
+      - name: Build portable Windows EXE
+        run: npm run dist:win
+
+      - name: Verify and create stable download filename
+        shell: pwsh
+        run: |
+          $versioned = "dist/Atom-Shooter-${{ steps.meta.outputs.version }}-Windows.exe"
+          if (-not (Test-Path $versioned)) {
+            throw "Expected Windows build not found: $versioned"
+          }
+          Copy-Item $versioned "dist/Atom-Shooter-Windows.exe" -Force
+
+      - name: Upload Actions artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: Atom-Shooter
-          path: dist/*.exe
+          name: Atom-Shooter-Windows-${{ steps.meta.outputs.version }}
+          path: |
+            dist/Atom-Shooter-${{ steps.meta.outputs.version }}-Windows.exe
+            dist/Atom-Shooter-Windows.exe
           if-no-files-found: error
 
-      - name: Attach EXE to tagged release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.exe
+      - name: Create or update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $title = "Atom Shooter $tag"
+          $versioned = "dist/Atom-Shooter-${{ steps.meta.outputs.version }}-Windows.exe"
+          $stable = "dist/Atom-Shooter-Windows.exe"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $versioned $stable --clobber
+            gh release edit $tag --title $title --latest
+          } else {
+            gh release create $tag $versioned $stable --title $title --generate-notes --latest --target "${{ github.sha }}"
+          }
