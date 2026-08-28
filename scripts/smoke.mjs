@@ -52,10 +52,12 @@ for (const file of [
 }
 
 const workflow = fs.readFileSync('.github/workflows/windows.yml', 'utf8');
-assert(workflow.includes('Atom-Shooter-Windows.exe'), 'Windows workflow must create the stable release filename');
+assert(workflow.includes('Atom-Shooter.exe'), 'Windows workflow must publish Atom-Shooter.exe');
 assert(workflow.includes('Expected Windows build not found'), 'Windows workflow must fail if the versioned EXE is missing');
 assert(workflow.includes('gh release create'), 'Windows workflow must create a GitHub Release');
 assert(workflow.includes('gh release upload') && workflow.includes('--clobber'), 'Windows workflow must update release assets safely');
+assert(workflow.includes('releases/assets/$assetId'), 'Windows workflow must remove obsolete custom release assets');
+assert(!workflow.includes('actions/upload-artifact'), 'Windows workflow must not publish duplicate Actions artifacts');
 assert(workflow.includes('contents: write'), 'Release workflow requires contents: write');
 
 

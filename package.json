@@ -34,7 +34,7 @@
       ]
     },
     "portable": {
-      "artifactName": "Atom-Shooter-${version}-Windows.exe"
+      "artifactName": "Atom-Shooter.exe"
     }
   },
   "type": "module"

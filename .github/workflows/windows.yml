@@ -43,38 +43,39 @@ jobs:
       - name: Build portable Windows EXE
         run: npm run dist:win
 
-      - name: Verify and create stable download filename
+      - name: Verify Windows EXE
         shell: pwsh
         run: |
-          $versioned = "dist/Atom-Shooter-${{ steps.meta.outputs.version }}-Windows.exe"
-          if (-not (Test-Path $versioned)) {
-            throw "Expected Windows build not found: $versioned"
+          $exe = "dist/Atom-Shooter.exe"
+          if (-not (Test-Path $exe)) {
+            throw "Expected Windows build not found: $exe"
           }
-          Copy-Item $versioned "dist/Atom-Shooter-Windows.exe" -Force
 
-      - name: Upload Actions artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Atom-Shooter-Windows-${{ steps.meta.outputs.version }}
-          path: |
-            dist/Atom-Shooter-${{ steps.meta.outputs.version }}-Windows.exe
-            dist/Atom-Shooter-Windows.exe
-          if-no-files-found: error
-
-      - name: Create or update GitHub Release
+      - name: Publish single EXE release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ steps.meta.outputs.tag }}"
           $title = "Atom Shooter $tag"
-          $versioned = "dist/Atom-Shooter-${{ steps.meta.outputs.version }}-Windows.exe"
-          $stable = "dist/Atom-Shooter-Windows.exe"
+          $exe = "dist/Atom-Shooter.exe"
 
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $versioned $stable --clobber
+            # Remove every previously uploaded custom asset so the release keeps
+            # exactly one project asset: Atom-Shooter.exe.
+            $assets = gh api "repos/${{ github.repository }}/releases/tags/$tag" --jq '.assets[] | [.id, .name] | @tsv'
+            foreach ($asset in $assets) {
+              if ([string]::IsNullOrWhiteSpace($asset)) { continue }
+              $parts = $asset -split "`t", 2
+              $assetId = $parts[0]
+              $assetName = $parts[1]
+              Write-Host "Deleting old release asset: $assetName"
+              gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$assetId"
+            }
+
+            gh release upload $tag $exe --clobber
             gh release edit $tag --title $title --latest
           } else {
-            gh release create $tag $versioned $stable --title $title --generate-notes --latest --target "${{ github.sha }}"
+            gh release create $tag $exe --title $title --generate-notes --latest --target "${{ github.sha }}"
           }
