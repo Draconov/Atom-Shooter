@@ -50,7 +50,7 @@ You pilot a microscopic ship inside an atom. Every element is its own level.
 6. Spend collected particles on **ships, weapons, engines, and modules**.
 7. Continue through the periodic table from **Hydrogen to element 118**.
 
-The post-split collection window scales with difficulty: early elements give **60 seconds**, gradually falling to a **20 second minimum** for the hardest atoms.
+The post-split collection window scales with difficulty: early elements give **60 seconds**, gradually falling to a **20 second minimum** for the hardest atoms. Reaching the minimum neutron quota no longer ends the level immediately. The full configured timer is honored: keep collecting bonus blue neutrons, and if you clear them all early, survive the remaining time against the red protons.
 
 ---
 
@@ -165,7 +165,7 @@ npm run dist:win
 The versioned output is:
 
 ```text
-dist/Atom-Shooter-1.1.0-Windows.exe
+dist/Atom-Shooter-1.1.1-Windows.exe
 ```
 
 ---
@@ -189,13 +189,13 @@ After that, pushes to `main` publish the game at:
 `.github/workflows/windows.yml` builds the portable EXE on:
 
 - every push to `main`;
-- version tags such as `v1.1.0`;
+- version tags such as `v1.1.1`;
 - manual **Run workflow** launches.
 
 The workflow uploads both:
 
 ```text
-Atom-Shooter-1.1.0-Windows.exe
+Atom-Shooter-1.1.1-Windows.exe
 Atom-Shooter-Windows.exe
 ```
 

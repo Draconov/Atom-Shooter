@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { ELEMENTS, SHIPS, getElectronShellCounts } from '../web/src/data.js';
-import { getCollectionWindow } from '../web/src/game.js';
+import { getCollectionWindow, getCollectionResolution } from '../web/src/game.js';
 import { AudioSystem } from '../web/src/audio.js';
 
 function assert(condition, message) {
@@ -25,6 +25,18 @@ for (let z = 1; z <= 118; z += 1) {
 assert(getCollectionWindow(1) === 60, 'Hydrogen should allow 60 seconds after the split');
 assert(getCollectionWindow(10) === 60, 'Neon should still allow 60 seconds after the split');
 assert(getCollectionWindow(118) === 20, 'Element 118 should allow the 20 second minimum');
+
+// Hitting the pass quota must not end the collection phase while bonus blue
+// particles remain. This regression previously made Hydrogen appear to ignore
+// its 60-second timer and end after the first neutron pickup.
+assert(getCollectionResolution({ timeLeft: 47, collected: 1, goal: 1 }) === null,
+  'Meeting the neutron quota early must keep the collection phase running');
+assert(getCollectionResolution({ timeLeft: 47, collected: 2, goal: 1 }) === null,
+  'Collecting every neutron must still honor the configured collection timer');
+assert(getCollectionResolution({ timeLeft: 0, collected: 1, goal: 1 }) === 'complete',
+  'Timer expiry should complete the level when the quota was met');
+assert(getCollectionResolution({ timeLeft: 0, collected: 0, goal: 1 }) === 'fail',
+  'Timer expiry should fail only when the quota was not met');
 
 for (const file of [
   'web/index.html',

@@ -25,6 +25,14 @@ export function getCollectionWindow(atomicNumber) {
   return Math.round(60 - 40 * Math.pow(progress, 0.82));
 }
 
+export function getCollectionResolution({ timeLeft, collected, goal }) {
+  // The post-split timer is the actual phase duration. Reaching the minimum
+  // quota (or even collecting every neutron) never shortens that duration.
+  // Once the clock reaches zero, meeting the quota wins; otherwise it fails.
+  if (timeLeft <= 0) return collected >= goal ? 'complete' : 'fail';
+  return null;
+}
+
 export class AtomGame {
   constructor(canvas, audio, hooks = {}) {
     this.canvas = canvas;
@@ -361,7 +369,16 @@ export class AtomGame {
 
     if (this.phase === 'post') {
       this.collectionTimeLeft = Math.max(0, this.collectionTimeLeft - dt);
-      if (this.collectionTimeLeft <= 0 && this.neutronCollected < this.neutronGoal) {
+      const resolution = getCollectionResolution({
+        timeLeft: this.collectionTimeLeft,
+        collected: this.neutronCollected,
+        goal: this.neutronGoal,
+      });
+      if (resolution === 'complete') {
+        this.completeLevel();
+        return;
+      }
+      if (resolution === 'fail') {
         this.failCollectionWindow();
         return;
       }
@@ -545,9 +562,8 @@ export class AtomGame {
         this.addScore(250);
         this.audio.collect();
         this.hooks.onCurrency?.();
-        if (this.neutronCollected >= this.neutronGoal) {
-          this.completeLevel();
-          return;
+        if (this.neutronCollected === this.neutronGoal) {
+          this.hooks.onObjective?.('Quota reached — keep collecting bonus neutrons!');
         }
       } else {
         this.damageShip('proton');
@@ -555,6 +571,14 @@ export class AtomGame {
     }
 
     this.nuclear = this.nuclear.filter((particle) => !particle.dead && particle.ttl > 0);
+  }
+
+  remainingNeutrons() {
+    let remaining = 0;
+    for (const particle of this.nuclear) {
+      if (!particle.dead && particle.ttl > 0 && particle.type === 'neutron') remaining += 1;
+    }
+    return remaining;
   }
 
   failCollectionWindow() {
@@ -689,6 +713,7 @@ export class AtomGame {
       total: this.electrons.length,
       neutronCollected: this.neutronCollected,
       neutronGoal: this.neutronGoal,
+      neutronRemaining: this.phase === 'post' ? this.remainingNeutrons() : 0,
       collectionSeconds,
       collectionDuration: this.collectionDuration,
     };
@@ -699,6 +724,7 @@ export class AtomGame {
       hud.phase,
       hud.orbiting,
       hud.neutronCollected,
+      hud.neutronRemaining,
       hud.collectionSeconds,
     ].join('|');
 

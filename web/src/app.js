@@ -256,7 +256,14 @@ function updateHUD(hud) {
   if (hud.phase === 'electrons') {
     $('#objective').textContent = `Shoot electrons • ${hud.orbiting} remaining`;
   } else if (hud.phase === 'post') {
-    $('#objective').textContent = `Neutrons ${hud.neutronCollected}/${hud.neutronGoal} • ${formatTime(hud.collectionSeconds)} • avoid red protons`;
+    const quotaMet = hud.neutronCollected >= hud.neutronGoal;
+    const quota = quotaMet ? ' ✓' : '';
+    const status = quotaMet
+      ? (hud.neutronRemaining > 0
+        ? ` • ${hud.neutronRemaining} bonus blue left`
+        : ' • all blue collected — survive')
+      : '';
+    $('#objective').textContent = `Neutrons ${hud.neutronCollected}/${hud.neutronGoal}${quota}${status} • ${formatTime(hud.collectionSeconds)} • avoid red protons`;
   }
 }
 
