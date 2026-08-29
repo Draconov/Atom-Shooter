@@ -54,6 +54,15 @@ export function canFireWeapon({ activeBullets, volleySize, bulletLimit, energy, 
     && energy + 1e-6 >= cost;
 }
 
+// The first electron shell is the visible inner safety boundary around the
+// nucleus. The ship hull may touch it, but crossing inside destroys the ship.
+export const CORE_EXCLUSION_RADIUS = 86;
+
+export function isShipInsideCore({ x, y, r = 0 }, coreRadius = CORE_EXCLUSION_RADIUS) {
+  const distance = Math.hypot(Number(x) - 500, Number(y) - 500);
+  return distance < Math.max(0, Number(coreRadius) || CORE_EXCLUSION_RADIUS) + Math.max(0, Number(r) || 0);
+}
+
 export class AtomGame {
   constructor(canvas, audio, hooks = {}) {
     this.canvas = canvas;
@@ -665,8 +674,12 @@ export class AtomGame {
       }
     }
 
-    const nucleusRadius = 28 + Math.sqrt(this.element.z) * 2.4;
-    if (this.phase !== 'post' && distance < nucleusRadius + ship.r) this.damageShip('nucleus');
+    // The innermost visible orbit is a hard safety boundary in every phase.
+    // Crossing it is fatal even with spawn invulnerability or Ghost active.
+    // Use the post-movement position so high-speed inward movement cannot get
+    // a free frame inside the core.
+    const coreRadius = this.shellRadii[0] || CORE_EXCLUSION_RADIUS;
+    if (isShipInsideCore(ship, coreRadius)) this.damageShip('core', { bypassProtection: true });
   }
 
   updateElectronPositions(dt) {
@@ -975,10 +988,10 @@ export class AtomGame {
     this.emitHUD(true);
   }
 
-  damageShip(reason) {
+  damageShip(reason, { bypassProtection = false } = {}) {
     const ship = this.ship;
-    if (ship.invuln > 0 || !this.running) return;
-    if (this.hasPower('ghost')) {
+    if (!this.running || (!bypassProtection && ship.invuln > 0)) return;
+    if (!bypassProtection && this.hasPower('ghost')) {
       this.shieldHit(ship.x, ship.y);
       ship.invuln = .16;
       return;
@@ -1329,6 +1342,25 @@ export class AtomGame {
       const radius = 28 + Math.sqrt(this.element.z) * 2.4;
       const blobs = clamp(Math.round(Math.sqrt(this.element.z) * 2), 4, 20);
       const pulse = this.phase === 'unstable' ? (1 + Math.sin(this.explosionTimer * 26) * .08) : 1;
+
+      if (this.phase === 'strip') {
+        const warningPulse = 0.72 + Math.sin(this.t * 5.2) * 0.18;
+        const warningGlowRadius = radius + 26 + Math.sin(this.t * 3.6) * 6;
+        const glow = c.createRadialGradient(500, 500, radius * 0.35, 500, 500, warningGlowRadius);
+        glow.addColorStop(0, `rgba(239,53,93,${0.16 + warningPulse * 0.1})`);
+        glow.addColorStop(0.5, `rgba(239,53,93,${0.12 + warningPulse * 0.08})`);
+        glow.addColorStop(1, 'rgba(239,53,93,0)');
+        c.fillStyle = glow;
+        c.beginPath();
+        c.arc(500, 500, warningGlowRadius, 0, TAU);
+        c.fill();
+
+        c.beginPath();
+        c.arc(500, 500, radius + 11 + Math.sin(this.t * 4.4) * 2.5, 0, TAU);
+        c.strokeStyle = `rgba(239,53,93,${0.34 + warningPulse * 0.2})`;
+        c.lineWidth = 5;
+        c.stroke();
+      }
 
       for (let i = 0; i < blobs; i += 1) {
         const angle = i * 2.399;

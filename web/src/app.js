@@ -719,7 +719,7 @@ function runTutorial() {
     'Pull the analog gently to aim. Pull it toward the border to fly.',
     'Tap FIRE on the other side — or press Space — to shoot. Weapons consume energy and recharge automatically.',
     'There are other control modes in Pause and Options. Give them a try!',
-    'Shoot the orbiting electrons. Do not fly into the nucleus.',
+    'Shoot the orbiting electrons. Crossing inside the innermost orbit destroys your ship instantly.',
     'Collect shot-down cyan electrons to earn shop currency.',
     'When every electron is stripped, the nucleus starts exploding.',
     'Avoid the red protons. Collect every blue neutron for an immediate win, or survive the timer.',

@@ -9,7 +9,7 @@ import {
   getElectronShellCounts,
   getMarathonThresholds,
 } from '../web/src/data.js';
-import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon } from '../web/src/game.js';
+import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon, CORE_EXCLUSION_RADIUS, isShipInsideCore } from '../web/src/game.js';
 import { AudioSystem, MUSIC_TRACKS } from '../web/src/audio.js';
 import { DEFAULT_SAVE, SAVE_SCHEMA, loadSave, normalizeSave, normalizeMarathonState } from '../web/src/save.js';
 import {
@@ -115,6 +115,11 @@ assert(canFireWeapon({ activeBullets: 44, volleySize: 4, bulletLimit: 48, energy
 assert(!canFireWeapon({ activeBullets: 47, volleySize: 4, bulletLimit: 48, energy: 20, cost: 7 }), 'A volley must not exceed the projectile limit');
 assert(!canFireWeapon({ activeBullets: 0, volleySize: 2, bulletLimit: 48, energy: 4, cost: 5 }), 'A weapon must not fire without enough energy');
 assert(!canFireWeapon({ activeBullets: 0, volleySize: 2, bulletLimit: 48, energy: 40, cost: 5, cooldown: 0.01 }), 'A weapon must respect pulse cooldown');
+
+assert(CORE_EXCLUSION_RADIUS === 86, 'The core death boundary must match the innermost 86px electron orbit');
+assert(isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS, r: 13 }), 'A ship hull crossing the inner orbit must be inside the lethal core zone');
+assert(!isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS + 13, r: 13 }), 'A ship whose hull only touches the inner orbit must remain safe');
+assert(!isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS + 40, r: 13 }), 'A ship outside the inner orbit must remain safe');
 
 for (const family of ['blaster', 'gatling', 'burster']) {
   const items = WEAPONS.filter((item) => item.family === family);
@@ -259,6 +264,7 @@ assert(appSource.includes('function renderCodex()'), 'App must expose the elemen
 assert(appSource.includes('function applyChallengeRewards(result)'), 'Classic completion must process optional challenge medals and rewards');
 
 const gameSource = fs.readFileSync('web/src/game.js', 'utf8');
+assert(gameSource.includes("damageShip('core', { bypassProtection: true })"), 'Crossing the inner orbit must cause unavoidable core death');
 assert(gameSource.includes('getElementBehavior'), 'Game must apply element-specific behavior profiles');
 assert(gameSource.includes('updateHazards(dt)'), 'Game must simulate radioactive/Marathon proton hazards');
 assert(gameSource.includes('challengeStates(true)'), 'Game completion must evaluate optional challenge outcomes');
