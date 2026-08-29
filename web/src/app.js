@@ -1,70 +1,42 @@
-import { ELEMENTS, SHIPS, WEAPONS, ENGINES, MODULES, findById } from './data.js';
+import {
+  ELEMENTS,
+  SHIPS,
+  WEAPONS,
+  ENGINES,
+  MODULES,
+  findById,
+} from './data.js';
 import { AudioSystem } from './audio.js';
 import { AtomGame } from './game.js';
+import { DEFAULT_SAVE, loadSave, normalizeMarathonState } from './save.js';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+const CONTROL_MODES = ['combined', 'split', 'dpad'];
 
-const DEFAULT_SAVE = {
-  version: 2,
-  unlocked: 1,
-  completed: {},
-  best: {},
-  electrons: 0,
-  neutrons: 0,
-  purchased: {
-    ships: ['pico'],
-    weapons: ['blaster2'],
-    engines: ['project1'],
-    modules: [],
-  },
-  selectedShip: 'pico',
-  selectedWeapon: 'blaster2',
-  selectedEngine: 'project1',
-  selectedModules: [],
-  tutorialDone: false,
-  settings: {
-    sfx: true,
-    music: true,
-    side: 'right',
-    stick: 'medium',
-    deadzone: 0.38,
-  },
+const SHOP_ASSET_PATHS = {
+  ships: 'assets/ships',
+  weapons: 'assets/weapons',
+  engines: 'assets/engines',
+  modules: 'assets/modules',
 };
 
-function loadSave() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('atom-shooter-save') || 'null');
-    return stored ? mergeSave(stored) : structuredClone(DEFAULT_SAVE);
-  } catch {
-    return structuredClone(DEFAULT_SAVE);
-  }
-}
+const CATEGORY_DATA = {
+  ships: SHIPS,
+  weapons: WEAPONS,
+  engines: ENGINES,
+  modules: MODULES,
+};
 
-function mergeSave(stored) {
-  const settings = { ...DEFAULT_SAVE.settings, ...(stored.settings || {}) };
-
-  // v1 shipped with music disabled by default and a nearly inaudible two-tone hum.
-  // Enable the rebuilt soundtrack once when upgrading existing pre-release saves.
-  if ((stored.version ?? 1) < 2) settings.music = true;
-
-  return {
-    ...structuredClone(DEFAULT_SAVE),
-    ...stored,
-    version: DEFAULT_SAVE.version,
-    purchased: { ...DEFAULT_SAVE.purchased, ...(stored.purchased || {}) },
-    settings,
-    completed: stored.completed || {},
-    best: stored.best || {},
-    selectedModules: stored.selectedModules || [],
-  };
-}
+const unique = (values) => [...new Set(values.filter(Boolean))];
 
 let save = loadSave();
-let currentScreen = 'main';
+let currentScreen = 'splash';
 let shopTab = 'ships';
 let gameContext = null;
 let toastTimer = null;
+let tutorialTimer = null;
+let shopTutorialStep = 0;
 
 const audio = new AudioSystem();
 audio.configure(save.settings);
@@ -76,23 +48,47 @@ const game = new AtomGame($('#game-canvas'), audio, {
     persist();
     updateWallets();
   },
+  onMessage: (message) => toast(message, 2600),
+  onMarathonState: (state) => {
+    if (game.mode !== 'marathon') return;
+    save.marathonResume = normalizeMarathonState(state);
+    persist();
+  },
   onPause: showPause,
   onComplete: levelComplete,
   onGameOver: gameOver,
-  onLifeLost: () => updateHUD(),
 });
 
 function persist() {
   localStorage.setItem('atom-shooter-save', JSON.stringify(save));
 }
 
+function getShopAssetPath(tab, itemOrId) {
+  const item = typeof itemOrId === 'string'
+    ? CATEGORY_DATA[tab].find((entry) => entry.id === itemOrId)
+    : itemOrId;
+  const asset = item?.asset || item?.id || String(itemOrId);
+  return `${SHOP_ASSET_PATHS[tab]}/${asset}.png`;
+}
+
+function itemPreviewMarkup(tab, item, options = {}) {
+  const className = options.small ? 'slot-icon' : 'shop-item-preview';
+  return `<div class="${className}" aria-hidden="true"><img src="${getShopAssetPath(tab, item)}" alt="" loading="lazy"></div>`;
+}
+
+function loadoutSlotMarkup(tab, item) {
+  return `<span class="slot">${itemPreviewMarkup(tab, item, { small: true })}<span>${item.name}</span></span>`;
+}
+
 function showScreen(name) {
   currentScreen = name;
+  if (name !== 'shop') closeShopTutorial();
   $$('.screen').forEach((screen) => screen.classList.toggle('active', screen.dataset.screen === name));
   if (name === 'main') updateMain();
   if (name === 'table') renderTable();
   if (name === 'shop') renderShop();
   if (name === 'options') syncSettings();
+  if (name === 'records') renderRecords();
   updateWallets();
 }
 
@@ -101,17 +97,30 @@ function updateMain() {
   $('#continue-hint').textContent = unlocked > 1
     ? `${unlocked - 1} / 118 elements cleared • ${ELEMENTS[Math.min(unlocked - 1, 117)].name} available`
     : '';
+  const resume = normalizeMarathonState(save.marathonResume);
+  const marathonButton = $('[data-action="marathon"]');
+  if (marathonButton) marathonButton.innerHTML = resume ? '<span>∞</span> Marathon • Resume' : '<span>∞</span> Marathon';
 }
 
 function updateWallets() {
   for (const id of ['table-electrons', 'shop-electrons', 'game-electrons']) {
     const element = $(`#${id}`);
-    if (element) element.textContent = save.electrons;
+    if (element) element.textContent = Number(save.electrons || 0).toLocaleString();
   }
   for (const id of ['table-neutrons', 'shop-neutrons', 'game-neutrons']) {
     const element = $(`#${id}`);
-    if (element) element.textContent = save.neutrons;
+    if (element) element.textContent = Number(save.neutrons || 0).toLocaleString();
   }
+}
+
+function recordSummary(z) {
+  const record = save.records?.[z];
+  if (!record) return '';
+  const parts = [];
+  if (record.score) parts.push(`Best ${Number(record.score).toLocaleString()} pts`);
+  if (record.time) parts.push(formatTime(record.time));
+  if (record.neutrons) parts.push(`${record.neutrons} n`);
+  return parts.join(' • ');
 }
 
 function renderTable() {
@@ -122,6 +131,7 @@ function renderTable() {
     const button = document.createElement('button');
     const done = Boolean(save.completed[element.z]);
     const open = element.z <= save.unlocked;
+    const summary = recordSummary(element.z);
 
     button.className = `element-cell ${done ? 'completed' : open ? 'available' : 'locked'} ${element.z === save.unlocked ? 'current' : ''}`;
     button.style.gridColumn = element.col;
@@ -129,7 +139,7 @@ function renderTable() {
     button.disabled = !open;
     button.innerHTML = `<span class="z">${element.z}</span><b class="sym">${element.symbol}</b><span class="nm">${element.name}</span>`;
     button.title = open
-      ? `${element.z}. ${element.name}${done ? ` — ${save.completed[element.z]}★` : ''}`
+      ? `${element.z}. ${element.name}${done ? ` — ${save.completed[element.z]}★` : ''}${summary ? ` — ${summary}` : ''}`
       : 'Complete the previous element to unlock';
 
     if (open) button.addEventListener('click', () => startGame(element.z - 1, 'classic'));
@@ -137,18 +147,40 @@ function renderTable() {
   }
 }
 
-function shipPreviewMarkup(item) {
-  if (!item.visual) return '';
-  const visual = item.visual;
-  return `<div class="ship-card-preview pattern-${visual.pattern || 'core'}" style="--ship-hull:${visual.hull};--ship-accent:${visual.accent};--ship-detail:${visual.detail};--ship-outline:${visual.outline}" aria-hidden="true"><span></span></div>`;
+function prerequisiteName(tab, item) {
+  if (!item.requires) return '';
+  return CATEGORY_DATA[tab].find((candidate) => candidate.id === item.requires)?.name || item.requires;
+}
+
+function shopStats(tab, item) {
+  if (tab === 'ships') {
+    const special = item.builtinPickup ? '<span class="chip">Built-in collector</span>' : '';
+    return `<span class="chip">Mass ${item.mass.toFixed(2)}</span><span class="chip">Size ×${item.size}</span><span class="chip">Slots ${item.slots}</span><span class="chip">Nucleus pull ×${item.gravity}</span><span class="chip">Pickup ×${item.pickup}</span>${special}`;
+  }
+  if (tab === 'weapons') {
+    const range = Math.round(item.speed * item.life);
+    const trigger = item.continuous ? 'Continuous' : 'Manual burst';
+    return `<span class="chip">Tier ${item.tier}/3</span><span class="chip">${item.bullets} projectile${item.bullets === 1 ? '' : 's'}</span><span class="chip">${item.rate.toFixed(1)}/s</span><span class="chip">Speed ${Math.round(item.speed)}</span><span class="chip">Range ${range}</span><span class="chip">Damage ${item.damage}</span><span class="chip">Energy ${item.capacity}</span><span class="chip">Restore ${item.regen}/s</span><span class="chip">Limit ${item.bulletLimit}</span><span class="chip">${trigger}</span>`;
+  }
+  if (tab === 'engines') {
+    const tier = ENGINES.indexOf(item) + 1;
+    return `<span class="chip">Stage ${tier}/5</span><span class="chip">Force ×${item.thrust}</span><span class="chip">Max speed ×${item.max}</span>`;
+  }
+  const effectLabels = {
+    pickup: `Pickup field ×${item.value}`,
+    gravity: `Nucleus pull ×${item.value}`,
+    bulletSpeed: `Projectile speed ×${item.value}`,
+    bulletSize: `Projectile size ×${item.value}`,
+    shipSize: `Ship size ×${item.value}`,
+    electronSpeed: `Electron speed ×${item.value}`,
+    time: `Time speed ×${item.value}`,
+  };
+  return `<span class="chip">Tier ${item.tier}/3</span><span class="chip">${effectLabels[item.effect] || 'Passive module'}</span>`;
 }
 
 function renderShop() {
-  const tabs = $$('#shop-tabs button');
-  tabs.forEach((button) => button.classList.toggle('active', button.dataset.tab === shopTab));
-
-  const categories = { ships: SHIPS, weapons: WEAPONS, engines: ENGINES, modules: MODULES };
-  const list = categories[shopTab];
+  $$('#shop-tabs button').forEach((button) => button.classList.toggle('active', button.dataset.tab === shopTab));
+  const list = CATEGORY_DATA[shopTab];
   const root = $('#shop-grid');
   root.innerHTML = '';
 
@@ -156,25 +188,24 @@ function renderShop() {
     const owned = save.purchased[shopTab].includes(item.id);
     const selected = isSelected(shopTab, item.id);
     const canAfford = save.electrons >= item.costE && save.neutrons >= item.costN;
+    const prerequisiteOwned = !item.requires || save.purchased[shopTab].includes(item.requires);
     const card = document.createElement('article');
-    card.className = `item-card ${selected ? 'selected' : ''}`;
+    card.className = `item-card ${selected ? 'selected' : ''} ${item.tier ? `tier-${item.tier}` : ''}`;
 
-    let stats = '';
-    if (shopTab === 'ships') {
-      stats = `<span class="chip">Mass ${item.mass.toFixed(2)}</span><span class="chip">Slots ${item.slots}</span>`;
-    } else if (shopTab === 'weapons') {
-      stats = `<span class="chip">${item.bullets} projectile${item.bullets > 1 ? 's' : ''}</span><span class="chip">${item.rate.toFixed(1)}/s</span>`;
-    } else if (shopTab === 'engines') {
-      stats = `<span class="chip">Thrust ×${item.thrust}</span>`;
-    } else {
-      stats = '<span class="chip">Passive module</span>';
+    let label = 'Buy';
+    let disabled = false;
+    if (!owned && !prerequisiteOwned) {
+      label = `Requires ${prerequisiteName(shopTab, item)}`;
+      disabled = true;
+    } else if (!owned && !canAfford) {
+      label = 'Not enough particles';
+      disabled = true;
+    } else if (owned) {
+      label = selected ? 'Equipped' : (shopTab === 'modules' ? 'Equip module' : 'Equip');
     }
 
-    const label = owned
-      ? (selected ? 'Equipped' : (shopTab === 'modules' ? 'Equip module' : 'Equip'))
-      : 'Buy';
-
-    card.innerHTML = `${shipPreviewMarkup(item)}<h3>${item.name}</h3><p>${item.desc}</p><div class="stats">${stats}</div><div class="price"><span><i class="e-dot"></i>${item.costE}</span><span><i class="n-dot"></i>${item.costN}</span></div><button class="${!owned ? 'primary' : ''}" ${!owned && !canAfford ? 'disabled' : ''}>${label}</button>`;
+    const family = item.family ? `<span class="family-label">${item.family.toUpperCase()} • ${item.tier}/3</span>` : '';
+    card.innerHTML = `${itemPreviewMarkup(shopTab, item)}${family}<h3>${item.name}</h3><p>${item.desc}</p><div class="stats">${shopStats(shopTab, item)}</div><div class="price"><span><i class="e-dot"></i>${item.costE}</span><span><i class="n-dot"></i>${item.costN}</span></div><button class="${!owned ? 'primary' : ''}" ${disabled ? 'disabled' : ''}>${label}</button>`;
     card.querySelector('button').addEventListener('click', () => buyOrEquip(shopTab, item));
     root.appendChild(card);
   }
@@ -189,30 +220,68 @@ function isSelected(tab, id) {
   return save.selectedModules.includes(id);
 }
 
+function sanitizeSelectedModules() {
+  const ship = findById(SHIPS, save.selectedShip);
+  if (ship.slots <= 0) {
+    save.selectedModules = [];
+    return;
+  }
+  const families = new Map();
+  for (const id of save.selectedModules) {
+    const module = MODULES.find((item) => item.id === id);
+    if (module) families.set(module.family, id);
+  }
+  save.selectedModules = [...families.values()].slice(0, ship.slots);
+}
+
 function buyOrEquip(tab, item) {
   const owned = save.purchased[tab].includes(item.id);
-
   if (!owned) {
+    if (item.requires && !save.purchased[tab].includes(item.requires)) {
+      toast(`Buy ${prerequisiteName(tab, item)} first`);
+      return;
+    }
     if (save.electrons < item.costE || save.neutrons < item.costN) return;
     save.electrons -= item.costE;
     save.neutrons -= item.costN;
     save.purchased[tab].push(item.id);
+    save.purchased[tab] = unique(save.purchased[tab]);
     toast(`${item.name} purchased`);
   }
 
-  if (tab === 'ships') save.selectedShip = item.id;
-  else if (tab === 'weapons') save.selectedWeapon = item.id;
-  else if (tab === 'engines') save.selectedEngine = item.id;
-  else {
+  if (tab === 'ships') {
+    save.selectedShip = item.id;
+    sanitizeSelectedModules();
+    if (item.slots === 0 && item.builtinPickup) toast(`${item.name}: built-in pickup field, no module slots`);
+  } else if (tab === 'weapons') {
+    save.selectedWeapon = item.id;
+  } else if (tab === 'engines') {
+    save.selectedEngine = item.id;
+  } else {
     const ship = findById(SHIPS, save.selectedShip);
-    const index = save.selectedModules.indexOf(item.id);
-    if (index >= 0) save.selectedModules.splice(index, 1);
-    else if (save.selectedModules.length < ship.slots) save.selectedModules.push(item.id);
-    else {
-      toast(`This ship has ${ship.slots} module slot${ship.slots === 1 ? '' : 's'}`);
-      persist();
-      renderShop();
-      return;
+    const selectedIndex = save.selectedModules.indexOf(item.id);
+    if (selectedIndex >= 0) {
+      save.selectedModules.splice(selectedIndex, 1);
+    } else {
+      if (ship.slots <= 0) {
+        toast(`${ship.name} has no module slots`);
+        persist();
+        renderShop();
+        return;
+      }
+      const sameFamilyIndex = save.selectedModules.findIndex((id) => (
+        MODULES.find((module) => module.id === id)?.family === item.family
+      ));
+      if (sameFamilyIndex >= 0) {
+        save.selectedModules[sameFamilyIndex] = item.id;
+      } else if (save.selectedModules.length < ship.slots) {
+        save.selectedModules.push(item.id);
+      } else {
+        toast(`This ship has ${ship.slots} module slot${ship.slots === 1 ? '' : 's'}`);
+        persist();
+        renderShop();
+        return;
+      }
     }
   }
 
@@ -225,22 +294,68 @@ function renderLoadout() {
   const ship = findById(SHIPS, save.selectedShip);
   const weapon = findById(WEAPONS, save.selectedWeapon);
   const engine = findById(ENGINES, save.selectedEngine);
-  const mods = save.selectedModules
-    .map((id) => MODULES.find((module) => module.id === id)?.name)
-    .filter(Boolean);
-
-  $('#loadout-panel').innerHTML = `<b>${ship.name}</b><div class="slots"><span class="slot">⚡ ${engine.name}</span><span class="slot">◉ ${weapon.name}</span>${mods.map((name) => `<span class="slot">◇ ${name}</span>`).join('')}${Array.from({ length: Math.max(0, ship.slots - mods.length) }, () => '<span class="slot">+ Empty slot</span>').join('')}</div>`;
+  const mods = save.selectedModules.map((id) => MODULES.find((module) => module.id === id)).filter(Boolean);
+  const special = ship.builtinPickup
+    ? '<span class="slot built-in"><span class="slot-plus">◎</span><span>Built-in Collector</span></span>'
+    : '';
+  $('#loadout-panel').innerHTML = `<b>${ship.name}</b><div class="slots">${loadoutSlotMarkup('engines', engine)}${loadoutSlotMarkup('weapons', weapon)}${special}${mods.map((module) => loadoutSlotMarkup('modules', module)).join('')}${Array.from({ length: Math.max(0, ship.slots - mods.length) }, () => '<span class="slot empty"><span class="slot-plus">+</span><span>Empty slot</span></span>').join('')}</div>`;
 }
 
-function startGame(index, mode, tutorial = false, marathonScore = 0) {
+function startGame(index, mode, tutorial = false, marathonState = null) {
   audio.unlock();
-  gameContext = { index, mode, tutorial, marathonScore };
+  clearInterval(tutorialTimer);
+  gameContext = { index, mode, tutorial, marathonState: normalizeMarathonState(marathonState) };
   showScreen('game');
   applyControlSettings();
   $('#tutorial-callout').classList.add('hidden');
-  game.start({ elementIndex: index, mode, save, tutorial, marathonScore });
+  game.start({ elementIndex: index, mode, save, tutorial, marathonState: gameContext.marathonState });
   $('#objective').textContent = tutorial ? 'Shoot the orbiting electron.' : 'Shoot and collect the electrons';
   if (tutorial) runTutorial();
+}
+
+function beginMarathon() {
+  const resume = normalizeMarathonState(save.marathonResume);
+  if (!resume) {
+    save.marathonResume = null;
+    persist();
+    startGame(0, 'marathon', false, null);
+    return;
+  }
+
+  showModal(
+    'Continue previous Marathon?',
+    `<p>You reached <b>${ELEMENTS[resume.index].name}</b> with <b>${resume.score.toLocaleString()}</b> points and <b>${resume.lives}</b> ship${resume.lives === 1 ? '' : 's'} remaining.</p><p>Continue that run, or start a new Marathon from Hydrogen.</p>`,
+    [
+      {
+        label: 'New Marathon',
+        fn: () => {
+          save.marathonResume = null;
+          persist();
+          closeModal();
+          startGame(0, 'marathon', false, null);
+        },
+      },
+      {
+        label: 'Continue',
+        primary: true,
+        fn: () => {
+          closeModal();
+          startGame(resume.index, 'marathon', false, resume);
+        },
+      },
+    ],
+  );
+}
+
+function livesMarkup(hud) {
+  if (hud.mode === 'marathon') {
+    const visible = Math.min(hud.lives, 5);
+    return `${Array.from({ length: visible }, () => '<span class="life-ship">▲</span>').join('')}${hud.lives > 5 ? `<span class="life-count">×${hud.lives}</span>` : ''}`;
+  }
+  return Array.from(
+    { length: 3 },
+    (_, index) => `<span class="life-ship ${index >= hud.lives ? 'lost' : ''}">▲</span>`,
+  ).join('');
 }
 
 function updateHUD(hud) {
@@ -248,58 +363,185 @@ function updateHUD(hud) {
   $('#element-symbol').textContent = hud.element.symbol;
   $('#element-name').textContent = hud.element.name;
   $('#score').textContent = hud.score.toLocaleString();
-  $('#life-indicator').innerHTML = Array.from(
-    { length: 3 },
-    (_, index) => `<span class="life-ship ${index >= hud.lives ? 'lost' : ''}">▲</span>`,
-  ).join('');
+  $('#life-indicator').innerHTML = livesMarkup(hud);
+
+  const energyPercent = Math.round((hud.energyFraction || 0) * 100);
+  $('#weapon-energy-fill').style.width = `${energyPercent}%`;
+  $('#weapon-energy-fill').classList.toggle('low', energyPercent <= 20);
+  $('#weapon-energy-text').textContent = `${Math.ceil(hud.energy)}/${Math.round(hud.energyCapacity)}`;
+
+  $('#powerup-timers').innerHTML = hud.activePowerups.map((item) => (
+    `<span class="powerup-chip" style="--power:${item.color}"><b>${item.symbol}</b>${item.name}<small>${item.remaining}s</small></span>`
+  )).join('');
+
+  const marathonNext = $('#marathon-next');
+  if (hud.mode === 'marathon') {
+    marathonNext.classList.remove('hidden');
+    marathonNext.textContent = hud.marathonNextShip
+      ? `Next ship ${(hud.marathonNextShip / 1000).toFixed(hud.marathonNextShip % 1000 ? 1 : 0)}k`
+      : 'No more bonus ships';
+  } else {
+    marathonNext.classList.add('hidden');
+  }
 
   if (hud.phase === 'electrons') {
     $('#objective').textContent = `Shoot electrons • ${hud.orbiting} remaining`;
   } else if (hud.phase === 'post') {
-    const quotaMet = hud.neutronCollected >= hud.neutronGoal;
-    const quota = quotaMet ? ' ✓' : '';
-    const status = quotaMet
-      ? (hud.neutronRemaining > 0
-        ? ` • ${hud.neutronRemaining} bonus blue left`
-        : ' • all blue collected — survive')
-      : '';
-    $('#objective').textContent = `Neutrons ${hud.neutronCollected}/${hud.neutronGoal}${quota}${status} • ${formatTime(hud.collectionSeconds)} • avoid red protons`;
+    $('#objective').textContent = `Blue ${hud.neutronCollected}/${hud.neutronTotal} • ${hud.neutronRemaining} left • ${formatTime(hud.collectionSeconds)} • collect all or survive`;
   }
 }
 
-function levelComplete(result) {
-  save.completed[result.element.z] = Math.max(save.completed[result.element.z] || 0, result.stars);
-  save.best[result.element.z] = Math.max(save.best[result.element.z] || 0, result.levelScore);
-  if (result.mode === 'classic') {
-    save.unlocked = Math.max(save.unlocked, Math.min(118, result.element.z + 1));
+function getExistingRecord(z) {
+  const record = save.records?.[z];
+  return record ? { ...record } : null;
+}
+
+function updateRecord(result) {
+  const z = result.element.z;
+  const previous = getExistingRecord(z);
+  const current = save.records[z] || { score: 0, time: 0, neutrons: 0 };
+  const time = Math.max(0, Number(result.time) || 0);
+  save.records[z] = {
+    score: Math.max(Number(current.score) || 0, Number(result.levelScore) || 0),
+    time: !current.time ? time : (time ? Math.min(Number(current.time), time) : Number(current.time)),
+    neutrons: Math.max(Number(current.neutrons) || 0, Number(result.neutrons) || 0),
+  };
+  save.best[z] = Math.max(Number(save.best[z]) || 0, Number(result.levelScore) || 0);
+  return previous;
+}
+
+function comparisonMarkup(previous, score) {
+  if (!previous?.score) return '<p class="muted">First recorded run for this element.</p>';
+  const delta = Math.round(Number(score) - Number(previous.score));
+  if (delta > 0) return `<p class="comparison ahead">You are <b>${delta.toLocaleString()} points ahead!</b></p>`;
+  if (delta < 0) return `<p class="comparison behind">You are <b>${Math.abs(delta).toLocaleString()} points behind.</b></p>`;
+  return '<p class="comparison">You matched your previous best score.</p>';
+}
+
+function affordableItemsMarkup() {
+  const affordable = [];
+  for (const [tab, items] of Object.entries(CATEGORY_DATA)) {
+    for (const item of items) {
+      if (save.purchased[tab].includes(item.id)) continue;
+      if (item.requires && !save.purchased[tab].includes(item.requires)) continue;
+      if (save.electrons < item.costE || save.neutrons < item.costN) continue;
+      affordable.push(item.name);
+    }
   }
-  if (result.mode === 'tutorial') save.tutorialDone = true;
+  if (!affordable.length) return '';
+  const shown = affordable.slice(0, 6);
+  const more = affordable.length > shown.length ? ` +${affordable.length - shown.length} more` : '';
+  return `<p class="affordable-line"><b>You can now afford:</b> ${shown.join(', ')}${more}</p>`;
+}
+
+function levelComplete(result) {
+  if (result.mode === 'marathon') {
+    const nextIndex = result.element.z < 118 ? result.element.z : null;
+    if (nextIndex !== null) {
+      const nextState = normalizeMarathonState({ ...result.marathonState, index: nextIndex });
+      save.marathonResume = nextState;
+      persist();
+      toast(`${result.element.symbol} cleared • Marathon continues`, 900);
+      setTimeout(() => startGame(nextIndex, 'marathon', false, nextState), 650);
+      return;
+    }
+
+    save.marathonResume = null;
+    const comparison = finishMarathonRun(result.marathonState, true);
+    persist();
+    showModal(
+      'Marathon Complete!',
+      `<p>You cleared all 118 elements.</p><p><b>${result.score.toLocaleString()} points</b> • ${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}`,
+      [
+        { label: 'Records', fn: () => { closeModal(); showScreen('records'); } },
+        { label: 'Main menu', primary: true, fn: () => { closeModal(); showScreen('main'); } },
+      ],
+    );
+    return;
+  }
+
+  if (result.mode === 'tutorial') {
+    save.tutorialDone = true;
+    persist();
+    showModal(
+      'Tutorial Complete!',
+      `<p><b>${result.element.name}</b> destabilized.</p><p>You stripped the electron, survived the nucleus split, and collected the resulting particles.</p>`,
+      [
+        { label: 'Main menu', fn: () => { closeModal(); showScreen('main'); } },
+        { label: 'Shop tutorial', primary: true, fn: () => { closeModal(); showScreen('shop'); runShopTutorial(); } },
+      ],
+    );
+    return;
+  }
+
+  // Per-element score/time/neutron records and periodic-table completion are
+  // Classic-mode progression, matching the APK's separate Marathon history.
+  const previous = updateRecord(result);
+  save.completed[result.element.z] = Math.max(save.completed[result.element.z] || 0, result.stars);
+  save.unlocked = Math.max(save.unlocked, Math.min(118, result.element.z + 1));
   persist();
 
   const next = result.element.z < 118 ? result.element.z : null;
+  const record = save.records[result.element.z];
   showModal(
     'Level Completed!',
-    `<p><b>${result.element.name}</b> destabilized.</p><p>${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)} &nbsp; ${formatTime(result.time)} &nbsp; Score ${result.levelScore.toLocaleString()}</p>`,
+    `<p><b>${result.element.name}</b> destabilized.</p><p>${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)} &nbsp; ${formatTime(result.time)} &nbsp; Score ${result.levelScore.toLocaleString()} &nbsp; Neutrons ${result.neutrons}</p>${comparisonMarkup(previous, result.levelScore)}<p class="best-line">Best: ${record.score.toLocaleString()} pts • ${formatTime(record.time)} • ${record.neutrons} neutrons</p>${affordableItemsMarkup()}`,
     [
       { label: 'Main menu', fn: () => { closeModal(); showScreen('main'); } },
-      ...(result.mode === 'classic' && next !== null
+      ...(next !== null
         ? [{ label: 'Next element', primary: true, fn: () => { closeModal(); startGame(next, 'classic'); } }]
-        : []),
-      ...(result.mode === 'marathon' && next !== null
-        ? [{ label: 'Continue', primary: true, fn: () => { closeModal(); startGame(next, 'marathon', false, result.score); } }]
-        : []),
-      ...(result.mode === 'tutorial'
-        ? [{ label: 'Classic mode', primary: true, fn: () => { closeModal(); showScreen('table'); } }]
         : []),
     ],
   );
 }
 
-function gameOver(result) {
-  const explanation = result.reason === 'collection-timeout'
-    ? `The split nucleus particle field dissipated before you collected enough neutrons.`
-    : `${result.element.name} won this round.`;
+function bestMarathonBeforeCurrent() {
+  if (!save.marathonHistory.length) return null;
+  return save.marathonHistory.reduce((best, run) => (!best || run.score > best.score ? run : best), null);
+}
 
+function finishMarathonRun(state, completedAll = false) {
+  const normalized = normalizeMarathonState(state, { allowDead: true }) || {
+    index: 0, score: 0, lives: 0, nextExtraIndex: 0, runTime: 0, runNeutrons: 0,
+  };
+  const previousBest = bestMarathonBeforeCurrent();
+  const run = {
+    score: normalized.score,
+    time: normalized.runTime,
+    neutrons: normalized.runNeutrons,
+    element: Math.min(118, normalized.index + 1),
+    completed: Boolean(completedAll),
+    at: Date.now(),
+  };
+  save.marathonHistory.push(run);
+  save.marathonHistory = save.marathonHistory.slice(-10);
+
+  if (!previousBest) return '<p class="muted">This is your first recorded Marathon.</p>';
+  const delta = run.score - previousBest.score;
+  if (delta > 0) return `<p class="comparison ahead">Comparing to your best run: <b>${delta.toLocaleString()} points ahead!</b></p>`;
+  if (delta < 0) return `<p class="comparison behind">Comparing to your best run: <b>${Math.abs(delta).toLocaleString()} points behind.</b></p>`;
+  return '<p class="comparison">Comparing to your best run: exact score tie.</p>';
+}
+
+function gameOver(result) {
+  const explanation = `${result.element.name} won this round.`;
+
+  if (result.mode === 'marathon') {
+    save.marathonResume = null;
+    const comparison = finishMarathonRun(result.marathonState, false);
+    persist();
+    showModal(
+      'Marathon Over!',
+      `<p>${explanation}</p><p>Score: <b>${result.score.toLocaleString()}</b> • Reached ${result.element.name}</p><p>${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}`,
+      [
+        { label: 'Main menu', fn: () => { closeModal(); showScreen('main'); } },
+        { label: 'New Marathon', primary: true, fn: () => { closeModal(); startGame(0, 'marathon', false, null); } },
+      ],
+    );
+    return;
+  }
+
+  persist();
   showModal(
     'Game Over!',
     `<p>${explanation}</p><p>Score: <b>${result.score.toLocaleString()}</b></p>`,
@@ -310,27 +552,62 @@ function gameOver(result) {
         primary: true,
         fn: () => {
           closeModal();
-          startGame(
-            gameContext.index,
-            gameContext.mode,
-            gameContext.tutorial,
-            gameContext.mode === 'marathon' ? 0 : gameContext.marathonScore,
-          );
+          startGame(gameContext.index, gameContext.mode, gameContext.tutorial, null);
         },
       },
     ],
   );
 }
 
+function nextControlMode() {
+  const index = CONTROL_MODES.indexOf(save.settings.controlMode);
+  save.settings.controlMode = CONTROL_MODES[(index + 1) % CONTROL_MODES.length];
+  persist();
+  applyControlSettings();
+}
+
+function controlModeLabel(mode) {
+  if (mode === 'split') return 'Fly + Shoot + Aim';
+  if (mode === 'dpad') return 'D-pad';
+  return 'Shoot + Fly&Aim';
+}
+
 function showPause() {
   if (!game.running) return;
-  game.setPaused(true);
+  if (!game.paused) game.setPaused(true);
+  const state = game.mode === 'marathon' ? game.getMarathonState() : null;
   showModal(
     'Game Paused',
-    `<p>${game.element.name} • Score ${game.score.toLocaleString()}</p>`,
+    `<p>${game.element.name} • Score ${game.score.toLocaleString()}${state ? ` • ${state.lives} ships` : ''}</p><p class="muted">Control mode: ${controlModeLabel(save.settings.controlMode)}</p>`,
     [
-      { label: 'Quit', fn: () => { game.stop(); closeModal(); showScreen(game.mode === 'classic' ? 'table' : 'main'); } },
-      { label: 'Restart', fn: () => { closeModal(); startGame(gameContext.index, gameContext.mode, gameContext.tutorial, gameContext.marathonScore); } },
+      {
+        label: 'Quit',
+        fn: () => {
+          game.stop();
+          closeModal();
+          showScreen(game.mode === 'classic' ? 'table' : 'main');
+        },
+      },
+      {
+        label: game.mode === 'marathon' ? 'Restart Marathon' : 'Restart',
+        fn: () => {
+          closeModal();
+          if (game.mode === 'marathon') {
+            save.marathonResume = null;
+            persist();
+            startGame(0, 'marathon', false, null);
+          } else {
+            startGame(gameContext.index, gameContext.mode, gameContext.tutorial, null);
+          }
+        },
+      },
+      {
+        label: `Controls: ${controlModeLabel(save.settings.controlMode)}`,
+        fn: () => {
+          nextControlMode();
+          showPause();
+        },
+      },
       { label: 'Resume', primary: true, fn: () => { closeModal(); game.setPaused(false); } },
     ],
     false,
@@ -341,29 +618,107 @@ function runTutorial() {
   const box = $('#tutorial-callout');
   box.classList.remove('hidden');
   const steps = [
-    'Welcome to Atom Shooter!',
-    'This is your ship. Use WASD / arrows, or the analog stick, to aim.',
-    'Push the stick farther to engage thrust. Inertia keeps you moving.',
-    'Tap FIRE or press Space to shoot the orbiting electron.',
-    'Collect the cyan electron after shooting it down.',
-    'When the nucleus explodes, collect blue neutrons and avoid red protons.',
+    'Welcome to Atom Shooter! This is your ship, flying inside the atom border.',
+    'Pull the analog gently to aim. Pull it toward the border to fly.',
+    'Tap FIRE on the other side — or press Space — to shoot. Weapons consume energy and recharge automatically.',
+    'There are other control modes in Pause and Options. Give them a try!',
+    'Shoot the orbiting electrons. Do not fly into the nucleus.',
+    'Collect shot-down cyan electrons to earn shop currency.',
+    'When every electron is stripped, the nucleus starts exploding.',
+    'Avoid the red protons. Collect every blue neutron for an immediate win, or survive the timer.',
+    'Starting from Beryllium, the nucleus pulls your ship. Take a moment to get used to flying against gravity.',
+    'Temporary power-ups can restore ammo, stop electrons, suppress gravity, enhance collection, strengthen fire, or turn you into a ghost.',
+    'After this level, the shop tutorial explains ships, weapon/engine stages, and module slots.',
   ];
   let index = 0;
   box.textContent = steps[0];
-
-  const timer = setInterval(() => {
+  clearInterval(tutorialTimer);
+  tutorialTimer = setInterval(() => {
     if (currentScreen !== 'game' || !game.tutorial || !game.running) {
-      clearInterval(timer);
+      clearInterval(tutorialTimer);
       return;
     }
     index += 1;
     if (index >= steps.length) {
       box.classList.add('hidden');
-      clearInterval(timer);
+      clearInterval(tutorialTimer);
     } else {
       box.textContent = steps[index];
     }
-  }, 4300);
+  }, 4200);
+}
+
+function clearShopTutorialFocus() {
+  $$('.tutorial-focus').forEach((element) => element.classList.remove('tutorial-focus'));
+}
+
+function closeShopTutorial() {
+  const box = $('#shop-tutorial');
+  if (!box) return;
+  box.classList.add('hidden');
+  box.innerHTML = '';
+  clearShopTutorialFocus();
+  shopTutorialStep = 0;
+}
+
+function runShopTutorial() {
+  const box = $('#shop-tutorial');
+  const steps = [
+    { text: '<b>This is the shop.</b> Your current ship, weapon, engine, modules and particle wallet all meet here.', focus: '#shop-tabs' },
+    { text: 'Use these category tabs to switch between Ships, Weapons, Engines and Modules.', focus: '#shop-tabs' },
+    { text: 'Every item card shows its description, important stats and electron/neutron price. Upgrade stages must be bought in order.', focus: '#shop-grid .item-card' },
+    { text: 'Weapon families and module families have upgrade tiers. A higher module tier replaces the lower equipped tier instead of stacking with it.', focus: '#shop-grid .item-card' },
+    { text: 'The loadout bar shows what is equipped and how many module slots remain on the selected ship.', focus: '#loadout-panel' },
+    { text: '<b>Shop tutorial complete.</b> Collect particles in levels, then come back here to build your loadout.', focus: null },
+  ];
+  shopTutorialStep = 0;
+  box.classList.remove('hidden');
+
+  const renderStep = () => {
+    clearShopTutorialFocus();
+    const step = steps[shopTutorialStep];
+    const focus = step.focus ? $(step.focus) : null;
+    focus?.classList.add('tutorial-focus');
+    box.innerHTML = `<p>${step.text}</p><div class="tutorial-actions"><button data-shop-tutorial="skip">Skip</button><button class="primary" data-shop-tutorial="next">${shopTutorialStep === steps.length - 1 ? 'Done' : 'Next'}</button></div>`;
+    box.querySelector('[data-shop-tutorial="skip"]').addEventListener('click', closeShopTutorial);
+    box.querySelector('[data-shop-tutorial="next"]').addEventListener('click', () => {
+      if (shopTutorialStep >= steps.length - 1) {
+        closeShopTutorial();
+        return;
+      }
+      shopTutorialStep += 1;
+      renderStep();
+    });
+  };
+  renderStep();
+}
+
+function renderRecords() {
+  const root = $('#records-content');
+  const records = ELEMENTS.filter((element) => save.records?.[element.z]);
+  const bestMarathon = bestMarathonBeforeCurrent();
+  const marathonRows = [...save.marathonHistory].reverse().slice(0, 10).map((run, index) => (
+    `<tr><td>${index + 1}</td><td>${Number(run.score).toLocaleString()}</td><td>${run.completed ? '118 / 118' : `${run.element || 1} / 118`}</td><td>${formatTime(run.time)}</td><td>${run.neutrons || 0}</td></tr>`
+  )).join('');
+  const levelRows = records.map((element) => {
+    const record = save.records[element.z];
+    return `<tr><td>${element.z}</td><td><b>${element.symbol}</b> ${element.name}</td><td>${Number(record.score || 0).toLocaleString()}</td><td>${record.time ? formatTime(record.time) : '—'}</td><td>${record.neutrons || 0}</td></tr>`;
+  }).join('');
+
+  root.innerHTML = `
+    <section class="record-summary">
+      <article><small>ELEMENTS CLEARED</small><b>${Object.keys(save.completed).length} / 118</b></article>
+      <article><small>BEST MARATHON</small><b>${bestMarathon ? Number(bestMarathon.score).toLocaleString() : '—'}</b></article>
+      <article><small>MARATHON RUNS</small><b>${save.marathonHistory.length}</b></article>
+    </section>
+    <section class="records-card">
+      <h3>Element bests</h3>
+      ${levelRows ? `<div class="records-scroll"><table><thead><tr><th>#</th><th>Element</th><th>Best score</th><th>Best time</th><th>Neutrons</th></tr></thead><tbody>${levelRows}</tbody></table></div>` : '<p class="muted">Complete an element to create your first record.</p>'}
+    </section>
+    <section class="records-card">
+      <h3>Marathon history</h3>
+      ${marathonRows ? `<div class="records-scroll"><table><thead><tr><th>Run</th><th>Points</th><th>Progress</th><th>Time</th><th>Neutrons</th></tr></thead><tbody>${marathonRows}</tbody></table></div>` : '<p class="muted">No completed Marathon attempts yet.</p>'}
+    </section>`;
 }
 
 function showModal(title, body, actions, allowBackdrop = true) {
@@ -393,7 +748,7 @@ function closeModal() {
 function showAbout() {
   showModal(
     'About Atom Shooter',
-    `<p>This is a clean-room browser/desktop recreation of the 2013 arcade concept: pilot a nano ship, strip electrons from each element, survive the nucleus explosion, and use collected particles to upgrade your loadout.</p><p>All code, vector-style graphics and synthesized audio in this repository are newly created. Original game names and historical references belong to their respective rights holders.</p><p><b>118 elements • Classic • Marathon • Tutorial • Shop • Touch + keyboard/mouse controls</b></p>`,
+    `<p>This is a clean-room browser/desktop recreation of the 2013 arcade concept: pilot a nano ship, strip electrons from all 118 elements, crack the nucleus, collect particles and build an increasingly capable loadout.</p><p>Version 1.2.0 restores the reference game's deeper upgrade trees, weapon-energy system, temporary power-ups, Marathon life progression, run history and alternate touch controls while keeping the modern two-path post-core objective.</p><p>All code, graphics and synthesized audio in this repository are newly created. The original APK, recovered source, music and proprietary art are not distributed here.</p>`,
     [{ label: 'Close', primary: true, fn: closeModal }],
   );
 }
@@ -405,6 +760,7 @@ function syncSettings() {
   $('#setting-side').value = settings.side;
   $('#setting-stick').value = settings.stick;
   $('#setting-deadzone').value = settings.deadzone;
+  $('#setting-control').value = settings.controlMode;
 }
 
 function saveSettings() {
@@ -414,8 +770,9 @@ function saveSettings() {
     side: $('#setting-side').value,
     stick: $('#setting-stick').value,
     deadzone: Number($('#setting-deadzone').value),
+    controlMode: $('#setting-control').value,
   };
-
+  if (!CONTROL_MODES.includes(save.settings.controlMode)) save.settings.controlMode = 'combined';
   audio.configure(save.settings);
   if (save.settings.music) audio.unlock();
   persist();
@@ -425,16 +782,16 @@ function saveSettings() {
 function applyControlSettings() {
   const controls = $('#touch-controls');
   controls.classList.toggle('controls-left', save.settings.side === 'left');
-  controls.classList.remove('stick-small', 'stick-medium', 'stick-large');
-  controls.classList.add(`stick-${save.settings.stick}`);
+  controls.classList.remove('stick-small', 'stick-medium', 'stick-large', 'mode-combined', 'mode-split', 'mode-dpad');
+  controls.classList.add(`stick-${save.settings.stick}`, `mode-${save.settings.controlMode}`);
 }
 
-function toast(message) {
+function toast(message, duration = 1800) {
   const element = $('#toast');
   element.textContent = message;
   element.classList.remove('hidden');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => element.classList.add('hidden'), 1800);
+  toastTimer = setTimeout(() => element.classList.add('hidden'), duration);
 }
 
 function formatTime(seconds) {
@@ -444,13 +801,24 @@ function formatTime(seconds) {
   return `${minutes}:${String(remainder).padStart(2, '0')}`;
 }
 
+function resetSave() {
+  save = structuredClone(DEFAULT_SAVE);
+  persist();
+  audio.configure(save.settings);
+  closeModal();
+  syncSettings();
+  updateWallets();
+  toast('Progress reset');
+}
+
 $$('[data-action]').forEach((button) => button.addEventListener('click', () => {
   audio.unlock();
   const action = button.dataset.action;
   if (action === 'classic') showScreen('table');
-  if (action === 'marathon') startGame(0, 'marathon');
-  if (action === 'tutorial') startGame(0, 'tutorial', true);
+  if (action === 'marathon') beginMarathon();
+  if (action === 'tutorial') startGame(0, 'tutorial', true, null);
   if (action === 'shop') showScreen('shop');
+  if (action === 'records') showScreen('records');
   if (action === 'options') showScreen('options');
   if (action === 'about') showAbout();
   if (action === 'home') showScreen('main');
@@ -463,22 +831,10 @@ $$('[data-action]').forEach((button) => button.addEventListener('click', () => {
   if (action === 'reset-save') {
     showModal(
       'Reset all progress?',
-      '<p>This deletes unlocked elements, high scores, currency and purchases on this device.</p>',
+      '<p>This deletes unlocked elements, records, Marathon history, currency and purchases on this device.</p>',
       [
         { label: 'Cancel', fn: closeModal },
-        {
-          label: 'Reset',
-          primary: true,
-          fn: () => {
-            save = structuredClone(DEFAULT_SAVE);
-            persist();
-            audio.configure(save.settings);
-            audio.unlock();
-            closeModal();
-            syncSettings();
-            toast('Progress reset');
-          },
-        },
+        { label: 'Reset', primary: true, fn: resetSave },
       ],
     );
   }
@@ -489,7 +845,7 @@ $$('#shop-tabs button').forEach((button) => button.addEventListener('click', () 
   renderShop();
 }));
 
-for (const id of ['setting-sfx', 'setting-music', 'setting-side', 'setting-stick', 'setting-deadzone']) {
+for (const id of ['setting-sfx', 'setting-music', 'setting-side', 'setting-stick', 'setting-deadzone', 'setting-control']) {
   $(`#${id}`).addEventListener('input', saveSettings);
 }
 
@@ -498,44 +854,42 @@ $('#modal').addEventListener('click', (event) => {
   if (event.target === $('#modal') && $('#modal').dataset.backdrop === '1') closeModal();
 });
 
-const joystick = $('#joystick');
-const knob = $('#joystick-knob');
-let joyPointer = null;
-
-function joyMove(event) {
-  if (event.pointerId !== joyPointer) return;
-  const rect = joystick.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-  const dx = event.clientX - cx;
-  const dy = event.clientY - cy;
-  const max = rect.width * 0.34;
-  const distance = Math.hypot(dx, dy);
-  const magnitude = Math.min(1, distance / max);
-  const nx = distance ? dx / distance : 0;
-  const ny = distance ? dy / distance : 0;
-  knob.style.transform = `translate(${nx * max * magnitude}px,${ny * max * magnitude}px)`;
-  game.setJoystick(nx, ny, magnitude);
+function bindJoystick(element, knob, setter) {
+  let pointer = null;
+  const move = (event) => {
+    if (event.pointerId !== pointer) return;
+    const rect = element.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = event.clientX - cx;
+    const dy = event.clientY - cy;
+    const max = rect.width * 0.34;
+    const distance = Math.hypot(dx, dy);
+    const magnitude = Math.min(1, distance / max);
+    const nx = distance ? dx / distance : 0;
+    const ny = distance ? dy / distance : 0;
+    knob.style.transform = `translate(${nx * max * magnitude}px,${ny * max * magnitude}px)`;
+    setter(nx, ny, magnitude);
+  };
+  const release = (event) => {
+    if (event?.pointerId !== undefined && event.pointerId !== pointer) return;
+    pointer = null;
+    knob.style.transform = 'translate(0,0)';
+    setter(0, 0, 0);
+  };
+  element.addEventListener('pointerdown', (event) => {
+    pointer = event.pointerId;
+    element.setPointerCapture(event.pointerId);
+    audio.unlock();
+    move(event);
+  });
+  element.addEventListener('pointermove', move);
+  element.addEventListener('pointerup', release);
+  element.addEventListener('pointercancel', release);
 }
 
-joystick.addEventListener('pointerdown', (event) => {
-  joyPointer = event.pointerId;
-  joystick.setPointerCapture(event.pointerId);
-  audio.unlock();
-  joyMove(event);
-});
-joystick.addEventListener('pointermove', joyMove);
-joystick.addEventListener('pointerup', (event) => {
-  if (event.pointerId !== joyPointer) return;
-  joyPointer = null;
-  knob.style.transform = 'translate(0,0)';
-  game.setJoystick(0, 0, 0);
-});
-joystick.addEventListener('pointercancel', () => {
-  joyPointer = null;
-  knob.style.transform = 'translate(0,0)';
-  game.setJoystick(0, 0, 0);
-});
+bindJoystick($('#joystick'), $('#joystick-knob'), (x, y, mag) => game.setJoystick(x, y, mag));
+bindJoystick($('#aim-joystick'), $('#aim-joystick-knob'), (x, y, mag) => game.setAimJoystick(x, y, mag));
 
 const fire = $('#fire-control');
 fire.addEventListener('pointerdown', (event) => {
@@ -545,7 +899,66 @@ fire.addEventListener('pointerdown', (event) => {
 fire.addEventListener('pointerup', () => game.setFire(false));
 fire.addEventListener('pointercancel', () => game.setFire(false));
 
+$$('[data-dpad]').forEach((button) => {
+  const direction = button.dataset.dpad;
+  button.addEventListener('pointerdown', (event) => {
+    button.setPointerCapture(event.pointerId);
+    audio.unlock();
+    game.setDpad(direction, true);
+  });
+  button.addEventListener('pointerup', () => game.setDpad(direction, false));
+  button.addEventListener('pointercancel', () => game.setDpad(direction, false));
+  button.addEventListener('pointerleave', (event) => {
+    if (event.buttons === 0) game.setDpad(direction, false);
+  });
+});
+
+async function preloadGameAssets() {
+  const paths = [
+    'assets/icon-192.png',
+    ...SHIPS.map((item) => getShopAssetPath('ships', item)),
+    ...WEAPONS.map((item) => getShopAssetPath('weapons', item)),
+    ...ENGINES.map((item) => getShopAssetPath('engines', item)),
+    ...MODULES.map((item) => getShopAssetPath('modules', item)),
+  ];
+  const uniquePaths = unique(paths);
+  let loaded = 0;
+  const fill = $('#loading-fill');
+  const label = $('#loading-label');
+
+  const update = () => {
+    const percent = Math.round((loaded / uniquePaths.length) * 100);
+    fill.style.width = `${percent}%`;
+    label.textContent = `Loading systems… ${percent}%`;
+  };
+  update();
+
+  await Promise.allSettled(uniquePaths.map((src) => new Promise((resolve) => {
+    const image = new Image();
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      loaded += 1;
+      update();
+      resolve();
+    };
+    image.onload = done;
+    image.onerror = done;
+    image.src = src;
+    if (image.complete) queueMicrotask(done);
+  })));
+}
+
 window.addEventListener('beforeunload', persist);
-applyControlSettings();
-persist();
-showScreen('main');
+
+async function bootstrap() {
+  applyControlSettings();
+  persist();
+  showScreen('splash');
+  await preloadGameAssets();
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  showScreen('main');
+}
+
+bootstrap();

@@ -1,0 +1,109 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Share the release lock with the Windows workflow. This prevents the two
+# platform jobs from editing the same GitHub Release at the same time.
+concurrency:
+  group: ${{ github.repository }}-release-assets
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read version
+        id: meta
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Run smoke checks
+        run: npm test
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Verify Android SDK 35
+        shell: bash
+        run: |
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$sdk_root" ]]; then
+            echo "GitHub runner did not expose ANDROID_HOME/ANDROID_SDK_ROOT" >&2
+            exit 1
+          fi
+          sdkmanager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -d "$sdk_root/platforms/android-35" || ! -d "$sdk_root/build-tools/35.0.0" ]]; then
+            yes | "$sdkmanager" --licenses >/dev/null || true
+            "$sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          fi
+          test -d "$sdk_root/platforms/android-35"
+          test -d "$sdk_root/build-tools/35.0.0"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build installable Android APK
+        run: gradle -p android :app:assembleDebug --no-daemon
+
+      - name: Prepare release APK
+        shell: bash
+        run: |
+          source_apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          release_apk="dist/Atom-Shooter.apk"
+          if [[ ! -f "$source_apk" ]]; then
+            echo "Expected Android build not found: $source_apk" >&2
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$source_apk" "$release_apk"
+          test -s "$release_apk"
+
+      - name: Publish Android release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.meta.outputs.tag }}"
+          title="Atom Shooter $tag"
+          apk="dist/Atom-Shooter.apk"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # Replace Android packages only. Never delete the Windows EXE.
+            while IFS=$'\t' read -r asset_id asset_name; do
+              [[ -z "${asset_id:-}" ]] && continue
+              if [[ "$asset_name" == *.apk ]]; then
+                echo "Deleting old Android release asset: $asset_name"
+                gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
+              fi
+            done < <(gh api "repos/${{ github.repository }}/releases/tags/$tag" --jq '.assets[] | [.id, .name] | @tsv')
+
+            gh release upload "$tag" "$apk" --clobber
+            gh release edit "$tag" --title "$title" --latest
+          else
+            gh release create "$tag" "$apk" --title "$title" --generate-notes --latest --target "${{ github.sha }}"
+          fi

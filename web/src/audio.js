@@ -106,6 +106,21 @@ export class AudioSystem {
     this.tone(720, 0.09, 'sine', 0.16, 450);
   }
 
+  powerup() {
+    this.tone(460, 0.08, 'triangle', 0.14, 260);
+    setTimeout(() => this.tone(720, 0.1, 'sine', 0.12, 360), 55);
+  }
+
+  empty() {
+    this.tone(165, 0.035, 'square', 0.055, -20);
+  }
+
+  extraLife() {
+    this.tone(440, 0.09, 'triangle', 0.13, 220);
+    setTimeout(() => this.tone(660, 0.1, 'triangle', 0.13, 250), 80);
+    setTimeout(() => this.tone(990, 0.13, 'sine', 0.12, 180), 170);
+  }
+
   proton() {
     this.tone(105, 0.22, 'sawtooth', 0.22, -55);
   }

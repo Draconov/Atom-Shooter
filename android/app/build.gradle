@@ -1,0 +1,49 @@
+import groovy.json.JsonSlurper
+
+plugins {
+    id 'com.android.application'
+}
+
+def packageJson = new JsonSlurper().parse(rootProject.file('../package.json'))
+def semver = packageJson.version.toString().tokenize('.').collect { it as int }
+def computedVersionCode = semver[0] * 10000 + semver[1] * 100 + semver[2]
+
+android {
+    namespace 'io.github.draconov.atomshooter'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.draconov.atomshooter'
+        minSdk 23
+        targetSdk 35
+        versionCode computedVersionCode
+        versionName packageJson.version.toString()
+    }
+
+    sourceSets {
+        main {
+            // Package the canonical web game directly. There is no second copy
+            // of the gameplay source to get out of sync with GitHub Pages/EXE.
+            assets.srcDirs = [rootProject.file('../web')]
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ''
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.15.0'
+}

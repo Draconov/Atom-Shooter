@@ -2,3 +2,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+android/.gradle/
+android/app/build/
+android/local.properties
+.idea/

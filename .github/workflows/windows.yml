@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: windows-release-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.repository }}-release-assets
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -51,7 +51,7 @@ jobs:
             throw "Expected Windows build not found: $exe"
           }
 
-      - name: Publish single EXE release asset
+      - name: Publish Windows release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,16 +62,18 @@ jobs:
 
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
-            # Remove every previously uploaded custom asset so the release keeps
-            # exactly one project asset: Atom-Shooter.exe.
+            # Replace Windows executables only. Preserve Atom-Shooter.apk so
+            # the release can carry both platform downloads.
             $assets = gh api "repos/${{ github.repository }}/releases/tags/$tag" --jq '.assets[] | [.id, .name] | @tsv'
             foreach ($asset in $assets) {
               if ([string]::IsNullOrWhiteSpace($asset)) { continue }
               $parts = $asset -split "`t", 2
               $assetId = $parts[0]
               $assetName = $parts[1]
-              Write-Host "Deleting old release asset: $assetName"
-              gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$assetId"
+              if ($assetName -like "*.exe") {
+                Write-Host "Deleting old Windows release asset: $assetName"
+                gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$assetId"
+              }
             }
 
             gh release upload $tag $exe --clobber

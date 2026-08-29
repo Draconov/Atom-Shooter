@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#eef3f5" />
+  <meta name="description" content="Atom Shooter — strip electrons, split nuclei and upgrade your nano ship across all 118 elements." />
   <title>Atom Shooter</title>
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
   <link rel="icon" href="./assets/icon-192.png" sizes="192x192" type="image/png" />
@@ -13,11 +14,20 @@
 </head>
 <body>
   <main id="app" class="app-shell" aria-live="polite">
-    <section id="screen-main" class="screen active" data-screen="main">
+    <section id="screen-splash" class="screen splash-screen active" data-screen="splash">
+      <div class="splash-card">
+        <img src="./assets/icon-192.png" width="132" height="132" alt="Atom Shooter" />
+        <p class="eyebrow">ATOM SHOOTER</p>
+        <h2>Initializing nano systems</h2>
+        <div class="loading-track" aria-hidden="true"><span id="loading-fill"></span></div>
+        <p id="loading-label" class="tiny muted">Loading systems… 0%</p>
+      </div>
+    </section>
+
+    <section id="screen-main" class="screen" data-screen="main">
       <div class="menu-card hero-card">
         <div class="atom-logo" aria-hidden="true">
-          <span class="orbit o1"></span><span class="orbit o2"></span><span class="orbit o3"></span>
-          <span class="logo-core"></span><span class="logo-ship"></span>
+          <img src="./assets/icon-192.png" alt="" loading="eager" decoding="async" />
         </div>
         <p class="eyebrow">CLEAN-ROOM WEB RECREATION</p>
         <h1>ATOM SHOOTER</h1>
@@ -29,6 +39,7 @@
         </div>
         <div class="secondary-actions">
           <button data-action="shop">Shop</button>
+          <button data-action="records">Records</button>
           <button data-action="options">Options</button>
           <button data-action="about">About</button>
         </div>
@@ -61,7 +72,16 @@
         <button data-tab="modules">Modules</button>
       </nav>
       <div id="shop-grid" class="shop-grid"></div>
+      <div id="shop-tutorial" class="shop-tutorial hidden" role="status"></div>
       <aside id="loadout-panel" class="loadout-panel"></aside>
+    </section>
+
+    <section id="screen-records" class="screen" data-screen="records">
+      <header class="topbar">
+        <button class="icon-btn" data-action="home" aria-label="Back">←</button>
+        <div><p class="eyebrow">HISTORY</p><h2>Records</h2></div><span></span>
+      </header>
+      <div id="records-content" class="records-content"></div>
     </section>
 
     <section id="screen-options" class="screen" data-screen="options">
@@ -70,11 +90,12 @@
         <div><p class="eyebrow">SETTINGS</p><h2>Options</h2></div><span></span>
       </header>
       <div class="settings-card">
-        <label class="setting-row"><span><b>Sound effects</b><small>Shots, impacts and pickups</small></span><input id="setting-sfx" type="checkbox" /></label>
+        <label class="setting-row"><span><b>Sound effects</b><small>Shots, impacts, pickups and alerts</small></span><input id="setting-sfx" type="checkbox" /></label>
         <label class="setting-row"><span><b>Ambient music</b><small>Procedural pulse soundtrack — starts after your first interaction</small></span><input id="setting-music" type="checkbox" /></label>
-        <label class="setting-row"><span><b>Joystick side</b><small>Swap mobile flight and fire controls</small></span><select id="setting-side"><option value="right">Right</option><option value="left">Left</option></select></label>
+        <label class="setting-row"><span><b>Control mode</b><small>Reference-style combined analog, split flight/aim, or D-pad</small></span><select id="setting-control"><option value="combined">Shoot + Fly&amp;Aim</option><option value="split">Fly + Shoot + Aim</option><option value="dpad">D-pad</option></select></label>
+        <label class="setting-row"><span><b>Control side</b><small>Swap the primary touch-control side</small></span><select id="setting-side"><option value="right">Right</option><option value="left">Left</option></select></label>
         <label class="setting-row"><span><b>Joystick size</b><small>Virtual analog control size</small></span><select id="setting-stick"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
-        <label class="setting-row"><span><b>Dead zone</b><small>How far the stick moves before thrust begins</small></span><input id="setting-deadzone" type="range" min="0.1" max="0.65" step="0.05" /></label>
+        <label class="setting-row"><span><b>Dead zone</b><small>How far the analog moves before thrust begins</small></span><input id="setting-deadzone" type="range" min="0.1" max="0.65" step="0.05" /></label>
         <div class="settings-buttons"><button data-action="reset-tutorial">Reset tutorial</button><button class="danger" data-action="reset-save">Reset all progress</button></div>
       </div>
     </section>
@@ -83,20 +104,33 @@
       <div class="game-topbar">
         <button id="pause-btn" class="icon-btn light" aria-label="Pause">Ⅱ</button>
         <div id="life-indicator" class="lives" aria-label="Lives"></div>
+        <div class="weapon-energy" aria-label="Weapon energy">
+          <span>ENERGY</span>
+          <div class="energy-track"><i id="weapon-energy-fill"></i></div>
+          <b id="weapon-energy-text">0/0</b>
+        </div>
         <div class="game-wallet"><span class="e-dot"></span><b id="game-electrons">0</b><span class="n-dot"></span><b id="game-neutrons">0</b></div>
       </div>
       <div id="game-stage" class="game-stage">
         <canvas id="game-canvas" width="1000" height="1000" aria-label="Atom Shooter game field"></canvas>
         <div id="objective" class="objective"></div>
+        <div id="powerup-timers" class="powerup-timers" aria-live="polite"></div>
         <div id="tutorial-callout" class="tutorial-callout hidden"></div>
-        <div id="touch-controls" class="touch-controls" aria-label="Touch controls">
+        <div id="touch-controls" class="touch-controls mode-combined" aria-label="Touch controls">
           <div id="fire-control" class="fire-control"><span>FIRE</span></div>
-          <div id="joystick" class="joystick"><div id="joystick-knob" class="joystick-knob"></div></div>
+          <div id="joystick" class="joystick flight-stick" aria-label="Flight control"><div id="joystick-knob" class="joystick-knob"></div></div>
+          <div id="aim-joystick" class="joystick aim-stick" aria-label="Aim control"><div id="aim-joystick-knob" class="joystick-knob"></div></div>
+          <div id="dpad-control" class="dpad-control" aria-label="D-pad">
+            <button class="dpad-up" data-dpad="up" aria-label="Thrust">▲</button>
+            <button class="dpad-left" data-dpad="left" aria-label="Turn left">◀</button>
+            <button class="dpad-right" data-dpad="right" aria-label="Turn right">▶</button>
+            <button class="dpad-down" data-dpad="down" aria-label="Reverse">▼</button>
+          </div>
         </div>
       </div>
       <div class="game-bottom">
         <div><span id="element-symbol" class="element-symbol">H</span><span id="element-name">Hydrogen</span></div>
-        <div><b id="score">0</b><small> SCORE</small></div>
+        <div class="score-block"><b id="score">0</b><small>SCORE</small><span id="marathon-next" class="marathon-next hidden"></span></div>
       </div>
     </section>
 

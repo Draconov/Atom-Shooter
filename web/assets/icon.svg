@@ -1,13 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="110" fill="#eef3f5"/>
-  <g fill="none" stroke="#ef355d" stroke-width="28" opacity=".75" transform="translate(256 256)">
-    <ellipse rx="190" ry="78"/>
-    <ellipse rx="190" ry="78" transform="rotate(60)"/>
-    <ellipse rx="190" ry="78" transform="rotate(120)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-label="Atom Shooter icon">
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="#ef355d"/>
+  <g fill="#ffffff" fill-opacity="0.28">
+    <ellipse cx="256" cy="256" rx="80" ry="172"/>
+    <ellipse cx="256" cy="256" rx="172" ry="80"/>
+    <ellipse cx="256" cy="256" rx="80" ry="172" transform="rotate(60 256 256)"/>
+    <ellipse cx="256" cy="256" rx="80" ry="172" transform="rotate(-60 256 256)"/>
   </g>
-  <circle cx="256" cy="256" r="78" fill="#fff"/>
-  <g transform="translate(256 256)">
-    <path d="M0 -92 L54 58 L0 34 L-54 58 Z" fill="#14a8b2" stroke="#34434a" stroke-width="10" stroke-linejoin="round"/>
-    <circle cx="0" cy="-18" r="11" fill="#ef355d"/>
-  </g>
+  <circle cx="256" cy="256" r="116" fill="#ffffff" fill-opacity="0.78"/>
+  <path fill="#ef355d" fill-rule="evenodd" d="M256 158c-17 0-62 109-62 109l28 74c2 7 10 10 16 5l18-15 18 15c6 5 14 2 16-5l28-74s-45-109-62-109Zm0 18c9 0 16 10 16 22s-7 22-16 22-16-10-16-22 7-22 16-22Zm-87 109c-9 0-17 7-17 16v52c0 6 6 10 12 7l60-28c6-3 7-11 2-16l-45-28a12 12 0 0 0-12-3Zm174 0a12 12 0 0 0-12 3l-45 28c-5 5-4 13 2 16l60 28c6 3 12-1 12-7v-52c0-9-8-16-17-16Zm-111 14 24 47v55h-18l-23-60 17-42Zm48 0 17 42-23 60h-18v-55l24-47Zm-36 122h24c11 0 20 9 20 20v12h-64v-12c0-11 9-20 20-20Z"/>
 </svg>

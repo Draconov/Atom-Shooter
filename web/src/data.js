@@ -24,41 +24,97 @@ const ROWS = [
   [8,{3:'La',4:'Ce',5:'Pr',6:'Nd',7:'Pm',8:'Sm',9:'Eu',10:'Gd',11:'Tb',12:'Dy',13:'Ho',14:'Er',15:'Tm',16:'Yb',17:'Lu'}],
   [9,{3:'Ac',4:'Th',5:'Pa',6:'U',7:'Np',8:'Pu',9:'Am',10:'Cm',11:'Bk',12:'Cf',13:'Es',14:'Fm',15:'Md',16:'No',17:'Lr'}]
 ];
-const POS = new Map(); for (const [row,cells] of ROWS) for (const [col,sym] of Object.entries(cells)) POS.set(sym,{row,col:+col});
+const POS = new Map();
+for (const [row,cells] of ROWS) for (const [col,sym] of Object.entries(cells)) POS.set(sym,{row,col:+col});
 for (const e of ELEMENTS) Object.assign(e,POS.get(e.symbol)||{row:1,col:1});
 
+// Ship names/descriptions and upgrade-slot identities mirror the reference APK.
 export const SHIPS = [
- {id:'pico',name:'Pico',costE:0,costN:0,mass:.72,size:.78,thrust:1.15,slots:0,pickup:1,gravity:1,visual:{hull:'#f9fcfd',accent:'#ef355d',detail:'#2e9ea7',outline:'#2e9ea7',canopy:'#34434a',pattern:'core'},desc:'The first quantum-sized vessel: very light, low inertia and easy to fly.'},
- {id:'nano',name:'Nano',costE:40,costN:3,mass:.85,size:.86,thrust:1.1,slots:1,pickup:1.05,gravity:.95,visual:{hull:'#e9fbff',accent:'#14a8b2',detail:'#5b7680',outline:'#2b8f9b',canopy:'#173f4c',pattern:'stripe'},desc:'Slightly larger than Pico, with one upgrade slot and reduced nucleus pull.'},
- {id:'falcon',name:'Falcon',costE:110,costN:10,mass:1.0,size:1,thrust:1.08,slots:2,pickup:1.12,gravity:.9,visual:{hull:'#fff8e7',accent:'#ef9d35',detail:'#94724c',outline:'#8b6d50',canopy:'#3d4a4f',pattern:'chevron'},desc:'A fast all-rounder with room for meaningful customization.'},
- {id:'behemoth',name:'Behemoth',costE:220,costN:24,mass:1.35,size:1.22,thrust:.92,slots:3,pickup:1.35,gravity:.88,visual:{hull:'#e9edf0',accent:'#dc4b63',detail:'#68767e',outline:'#58666d',canopy:'#27383f',pattern:'armor'},desc:'A large vessel: slower to change direction, but excellent at collecting particles.'},
- {id:'hawk',name:'Hawk',costE:420,costN:48,mass:1.18,size:1.08,thrust:1.18,slots:3,pickup:1.23,gravity:.8,visual:{hull:'#edf5eb',accent:'#4f9d69',detail:'#6d7f64',outline:'#4f7159',canopy:'#263e36',pattern:'panel'},desc:'A compromise between Behemoth size and nimble handling.'},
- {id:'nano2',name:'Nano II',costE:700,costN:90,mass:.76,size:.82,thrust:1.28,slots:4,pickup:1.5,gravity:.72,visual:{hull:'#f1eeff',accent:'#7868d8',detail:'#4aa5b8',outline:'#655ba3',canopy:'#2d2b51',pattern:'grid'},desc:'Second-generation Nano with a built-in electron pickup field.'}
-];
-export const WEAPONS = [
- {id:'blaster2',name:'Blaster 2000',costE:0,costN:0,rate:3.4,speed:650,life:1.0,bullets:2,spread:.035,size:5,damage:1,desc:'The first nano weapon. Fires a tight two-particle shot.'},
- {id:'blaster3',name:'Blaster 3000',costE:55,costN:4,rate:3.7,speed:710,life:1.08,bullets:3,spread:.055,size:5.5,damage:1,desc:'Improved Blaster: three particles with higher range and velocity.'},
- {id:'blaster4',name:'Blaster 4000',costE:130,costN:12,rate:4.2,speed:760,life:1.14,bullets:4,spread:.07,size:6,damage:1,desc:'A rapid four-particle blaster for clearing busy shells.'},
- {id:'gatling',name:'Gatling Gun',costE:210,costN:24,rate:8.5,speed:690,life:.9,bullets:1,spread:.045,size:4.2,damage:1,desc:'High rate of fire with moderate dispersion.'},
- {id:'burster',name:'Burster',costE:330,costN:38,rate:2.4,speed:620,life:.95,bullets:5,spread:.18,size:5.2,damage:1,desc:'Bursts five particles. Brutal at short range.'},
- {id:'railgun',name:'Railgun',costE:560,costN:70,rate:1.8,speed:1050,life:1.25,bullets:1,spread:0,size:7.5,damage:2,desc:'A precise, extremely fast particle lance.'}
-];
-export const ENGINES = [
- {id:'project1',name:'Project L1',costE:0,costN:0,thrust:1,max:1,desc:'First-generation quantum engine.'},
- {id:'project2',name:'Project L2',costE:60,costN:5,thrust:1.12,max:1.08,desc:'More power helps larger ships escape nucleus gravity.'},
- {id:'project3',name:'Project L3',costE:150,costN:14,thrust:1.25,max:1.15,desc:'A stronger and more responsive propulsion package.'},
- {id:'vrocket',name:'V-Rocket',costE:280,costN:30,thrust:1.4,max:1.25,desc:'A forceful engine best suited to heavier vessels.'},
- {id:'solar',name:'Solar Ex2.0',costE:500,costN:62,thrust:1.58,max:1.36,desc:'Late-game engine with serious escape velocity.'}
-];
-export const MODULES = [
- {id:'collector',name:'Collector',costE:45,costN:3,effect:'pickup',value:1.3,desc:'Generates a small electron and neutron collecting field.'},
- {id:'lowgrav',name:'LowGrav',costE:90,costN:8,effect:'gravity',value:.9,desc:'Lowers nucleus gravity by 10%.'},
- {id:'fastfire',name:'FastFire25',costE:130,costN:12,effect:'rate',value:1.25,desc:'Raises weapon pulse frequency by 25%.'},
- {id:'projectile',name:'Q-Ray',costE:170,costN:18,effect:'bulletSpeed',value:1.25,desc:'Makes projectiles fly 25% faster.'},
- {id:'size',name:'Small',costE:210,costN:22,effect:'shipSize',value:.9,desc:'Makes the ship 10% smaller and harder to hit.'},
- {id:'slowel',name:'SLow El',costE:260,costN:28,effect:'electronSpeed',value:.85,desc:'Electrons orbit 15% slower.'},
- {id:'timewarp',name:'TimeWarp',costE:350,costN:42,effect:'time',value:.9,desc:'Slows hostile particle motion by 10%.'}
+ {id:'pico',name:'Pico',costE:0,costN:0,mass:.72,size:.78,thrust:1.15,slots:0,pickup:1,gravity:1,visual:{pattern:'core'},desc:'The first ever quantum sized vessel. It is prone to nucleus pull force. On the other hand it is very light and low inertia makes this ship easy to fly.'},
+ {id:'nano',name:'Nano',costE:40,costN:3,mass:.85,size:.86,thrust:1.1,slots:1,pickup:1.05,gravity:.95,visual:{pattern:'stripe'},desc:'Slightly larger than Pico! Still very light, fast and easy to handle. It has one upgrade slot and a slightly reduced nucleus pull.'},
+ {id:'falcon',name:'Falcon',costE:110,costN:10,mass:1.0,size:1,thrust:1.08,slots:2,pickup:1.12,gravity:.9,visual:{pattern:'chevron'},desc:'A considerably large vessel. Its mass adds inertia, while two upgrade slots and a larger pickup footprint make it highly configurable.'},
+ {id:'behemoth',name:'Behemoth',costE:220,costN:24,mass:1.35,size:1.22,thrust:.92,slots:4,pickup:1.35,gravity:.88,visual:{pattern:'armor'},desc:'The largest available ship — a real nano fortress. Heavy handling is compensated by four upgrade slots and excellent particle collection.'},
+ {id:'hawk',name:'Hawk',costE:420,costN:48,mass:1.18,size:1.08,thrust:1.18,slots:3,pickup:1.23,gravity:.8,visual:{pattern:'panel'},desc:'A reasonable compromise between size, handling and features. Smaller and easier to handle than Behemoth without losing too much flexibility.'},
+ {id:'nano2',name:'Nano II',costE:700,costN:90,mass:.76,size:.82,thrust:1.28,slots:0,pickup:1.6,gravity:.72,builtinPickup:true,visual:{pattern:'grid'},desc:'Second generation Nano. It has no module slots, but comes with a built-in electron pick-up field.'}
 ];
 
-export function getElectronShellCounts(z){const orbitals=[[1,2],[2,2],[2,6],[3,2],[3,6],[4,2],[3,10],[4,6],[5,2],[4,10],[5,6],[6,2],[4,14],[5,10],[6,6],[7,2],[5,14],[6,10],[7,6]];const shells=[0,0,0,0,0,0,0];let left=z;for(const [n,cap] of orbitals){if(left<=0)break;const take=Math.min(left,cap);shells[n-1]+=take;left-=take}return shells;}
+const ENERGY = {
+  blaster2:{capacity:46,regen:17,cost:5}, blaster3:{capacity:52,regen:18,cost:6}, blaster4:{capacity:60,regen:20,cost:7},
+  gatling:{capacity:70,regen:24,cost:3.2}, gatlingp:{capacity:78,regen:27,cost:3.1}, gatlings:{capacity:90,regen:31,cost:2.8},
+  burster:{capacity:58,regen:18,cost:12}, bursterf:{capacity:66,regen:22,cost:14}, bursterr:{capacity:76,regen:25,cost:17},
+};
+const weapon = (data) => ({continuous:true,bulletLimit:48,manualFire:true,pierce:1,...ENERGY[data.id],...data});
+
+// The APK uses three weapon families with three stages each.
+export const WEAPONS = [
+ weapon({id:'blaster2',family:'blaster',tier:1,asset:'blaster2',name:'Blaster 2000',costE:0,costN:0,rate:3.4,speed:650,life:1.0,bullets:2,spread:.035,size:5,damage:1,desc:'The first nano weapon ever created. Can shoot up to 2 particles.'}),
+ weapon({id:'blaster3',family:'blaster',tier:2,asset:'blaster3',requires:'blaster2',name:'Blaster 3000',costE:55,costN:4,rate:3.7,speed:710,life:1.08,bullets:3,spread:.055,size:5.5,damage:1,desc:'Improved Blaster can shoot 3 particles with higher range and velocity.'}),
+ weapon({id:'blaster4',family:'blaster',tier:3,asset:'blaster4',requires:'blaster3',name:'Blaster 4000',costE:130,costN:12,rate:4.2,speed:790,life:1.14,bullets:4,spread:.06,size:6,damage:1,pierce:2,desc:'Shoots up to 4 super fast particles. Each particle can destroy up to 2 electrons!'}),
+ weapon({id:'gatling',family:'gatling',tier:1,asset:'gatling',name:'Gatling Gun',costE:210,costN:24,rate:6,speed:690,life:.9,bullets:1,spread:.075,size:4.2,damage:1,bulletLimit:60,desc:'Shooting 6 rounds per second is impressive, although it lacks a bit of precision.'}),
+ weapon({id:'gatlingp',family:'gatling',tier:2,asset:'gatlingp',requires:'gatling',name:'Gatling Gun P',costE:320,costN:36,rate:10,speed:790,life:.94,bullets:1,spread:.04,size:4.1,damage:1,bulletLimit:72,desc:'Shoots 10 rounds per second. Increased precision and particle velocity.'}),
+ weapon({id:'gatlings',family:'gatling',tier:3,asset:'gatlings',requires:'gatlingp',name:'Gatling Gun S',costE:470,costN:54,rate:20,speed:830,life:.95,bullets:1,spread:.025,size:4,damage:.5,bulletLimit:96,desc:'It takes 2 hits to destroy an electron — but with increased accuracy and 20 rounds per second it is hardly an issue.'}),
+ weapon({id:'burster',family:'burster',tier:1,asset:'burster',name:'Burster',costE:330,costN:38,rate:1.85,speed:620,life:.95,bullets:5,spread:.18,size:5.2,damage:1,continuous:false,desc:'This weapon bursts 5 particles with little precision. Good for short range.'}),
+ weapon({id:'bursterf',family:'burster',tier:2,asset:'bursterf',requires:'burster',name:'Burster F',costE:460,costN:55,rate:2.25,speed:675,life:1.0,bullets:7,spread:.14,size:5.1,damage:1,continuous:false,desc:'Fires 7 particles with more precision and slightly higher velocity. Faster reload times.'}),
+ weapon({id:'bursterr',family:'burster',tier:3,asset:'bursterr',requires:'bursterf',name:'Burster R',costE:620,costN:78,rate:2.8,speed:710,life:1.04,bullets:10,spread:.115,size:5,damage:1,continuous:false,bulletLimit:80,desc:'Fires 10 particles. Good reload time and precision make it a great weapon.'})
+];
+
+export const ENGINES = [
+ {id:'vrocket',asset:'vrocket',name:'V-Rocket',costE:0,costN:0,thrust:1,max:1,desc:'First generation quantum rocket. May not be enough for larger ships.'},
+ {id:'vrocketx',asset:'vrocketx',requires:'vrocket',name:'V-Rocket X',costE:60,costN:5,thrust:1.12,max:1.08,desc:'More powerful engine control helps larger ships and makes it easier to escape nucleus force.'},
+ {id:'vrocketdx',asset:'vrocketdx',requires:'vrocketx',name:'V-Rocket DX',costE:150,costN:14,thrust:1.25,max:1.15,desc:'As ships get larger and nucleus force stronger, the engine specifications are pushed even further.'},
+ {id:'qray',asset:'qray',requires:'vrocketdx',name:'Q-Ray',costE:280,costN:30,thrust:1.4,max:1.25,desc:'Not recommended on the smallest ships: this much power can make them hard to handle.'},
+ {id:'solar',asset:'solar',requires:'qray',name:'Solar Ex2.0',costE:500,costN:62,thrust:1.58,max:1.36,desc:'It is unbelievable how much force this little sub-atomic engine can provide.'}
+];
+
+const MODULE_FAMILIES = [
+  {family:'collector',asset:'collector',names:['Collector','Collector L','Collector XL'],effects:[1.25,1.5,1.85],effect:'pickup',costs:[[45,3],[110,10],[240,25]],descs:['This module generates a small electron collecting field.','A stronger collecting field reaches farther around the ship.','The largest collector field in the module family.']},
+  {family:'project',asset:'projectile',names:['Project L1','Project L2','Project L3'],effects:[1.25,1.5,1.75],effect:'bulletSize',costs:[[70,5],[150,14],[290,31]],descs:['Makes projectiles 25% larger.','Makes projectiles 50% larger.','Makes projectiles 75% larger.']},
+  {family:'fastfire',asset:'fastfire',names:['FastFire25','FastFire50','FastFire75'],effects:[1.25,1.5,1.75],effect:'bulletSpeed',costs:[[95,8],[190,18],[350,38]],descs:['Makes projectiles fly 25% faster.','Makes projectiles fly 50% faster.','Makes projectiles fly 75% faster.']},
+  {family:'small',asset:'size',names:['Small','Small R','Small EST'],effects:[.9,.8,.6],effect:'shipSize',costs:[[120,10],[230,24],[420,48]],descs:['Makes ship 10% smaller. Smaller ship is less likely to hit anything.','Makes ship 20% smaller. Smaller ship is less likely to hit anything.','Makes ship 40% smaller. Smaller ship is less likely to hit anything.']},
+  {family:'lowgrav',asset:'lowgrav',names:['LowGrav','LowGrav2','LowGrav3'],effects:[.9,.85,.8],effect:'gravity',costs:[[90,8],[190,19],[360,41]],descs:['Lowers nucleus gravity by 10%.','Lowers nucleus gravity by 15%.','Lowers nucleus gravity by 20%.']},
+  {family:'slowel',asset:'slowel',names:['SLow El','SLowR El','SLowST El'],effects:[.85,.7,.5],effect:'electronSpeed',costs:[[130,12],[250,27],[460,55]],descs:['Electrons orbit 15% slower.','Electrons orbit 30% slower.','Electrons orbit 50% slower.']},
+  {family:'timewarp',asset:'timewarp',names:['TimeWarp','TimeWarp Mk2','TimeWarp Mk3'],effects:[.9,.85,.8],effect:'time',costs:[[170,16],[320,34],[560,70]],descs:['Slows down time by 10%. A subtle change.','Slows down time by 15%.','Slows down time by 20%. May not feel like much, but it can make a difference.']},
+];
+
+export const MODULES = MODULE_FAMILIES.flatMap((family) => family.names.map((name,index) => {
+  const tier = index + 1;
+  const id = tier === 1 ? family.family : `${family.family}${tier}`;
+  return {
+    id,
+    family:family.family,
+    tier,
+    asset:id,
+    name,
+    costE:family.costs[index][0],
+    costN:family.costs[index][1],
+    effect:family.effect,
+    value:family.effects[index],
+    requires:tier > 1 ? (tier === 2 ? family.family : `${family.family}${tier-1}`) : null,
+    desc:family.descs[index],
+  };
+}));
+
+export const POWERUPS = [
+  {id:'ammo',name:'Ammo',symbol:'A',color:'#f2b23b',duration:0,desc:'Instantly restores weapon energy.'},
+  {id:'bigfire',name:'Big Fire',symbol:'F',color:'#ef6b35',duration:12,desc:'Temporarily increases projectile size and impact.'},
+  {id:'collect',name:'Collector Boost',symbol:'C',color:'#20a99f',duration:12,desc:'Temporarily expands the pickup field.'},
+  {id:'electronstop',name:'Electron Stop',symbol:'Ⅱ',color:'#2f8dd8',duration:8,desc:'Stops orbiting electrons for a short time.'},
+  {id:'ghost',name:'Ghost',symbol:'G',color:'#8f6bd8',duration:9,desc:'Temporarily prevents collision damage.'},
+  {id:'gravity',name:'Gravity Off',symbol:'↓',color:'#5ba7b4',duration:10,desc:'Temporarily suppresses nucleus gravity.'},
+];
+
+export function getElectronShellCounts(z){
+  const orbitals=[[1,2],[2,2],[2,6],[3,2],[3,6],[4,2],[3,10],[4,6],[5,2],[4,10],[5,6],[6,2],[4,14],[5,10],[6,6],[7,2],[5,14],[6,10],[7,6]];
+  const shells=[0,0,0,0,0,0,0];let left=z;
+  for(const [n,cap] of orbitals){if(left<=0)break;const take=Math.min(left,cap);shells[n-1]+=take;left-=take}
+  return shells;
+}
+
+export function getMarathonThresholds(count=100){
+  const thresholds=[];let score=0;let increment=10000;
+  for(let i=0;i<count;i+=1){score+=increment;thresholds.push(score);increment+=5000;}
+  return thresholds;
+}
+
 export function findById(list,id){return list.find(x=>x.id===id)||list[0]}
+export function findModuleFamily(family,tier=1){return MODULES.find((item)=>item.family===family&&item.tier===tier)}
