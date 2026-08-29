@@ -13,7 +13,6 @@
 [![Build Windows EXE](https://github.com/Draconov/Atom-Shooter/actions/workflows/windows.yml/badge.svg)](https://github.com/Draconov/Atom-Shooter/actions/workflows/windows.yml)
 [![Build Android APK](https://github.com/Draconov/Atom-Shooter/actions/workflows/android.yml/badge.svg)](https://github.com/Draconov/Atom-Shooter/actions/workflows/android.yml)
 
-**v1.2.0 | Web | Windows | Android | 118 elements**
 </div>
 
 ---
@@ -22,7 +21,7 @@
 
 Atom Shooter is an independent remake of the original Android game, rebuilt from scratch for modern browsers, Windows, and Android.
 
-The project keeps the original game's core identity and progression while using newly written code, newly created graphics, and synthesized audio. Version 1.2.0 expands the recreation substantially and brings the current project much closer to the reference Android release.
+The repository does not distribute original files like code, music, or proprietary artwork. Everything used in this project are newly created for the remake trying to keep the original game's core identity and progression.
 
 ## Platforms
 
@@ -108,12 +107,6 @@ GitHub Actions handles all three distribution targets.
 The web workflow deploys the `web/` directory to GitHub Pages. The Windows workflow builds `Atom-Shooter.exe`, and the Android workflow builds `Atom-Shooter.apk`.
 
 Both binary workflows use the version from `package.json` and update the matching GitHub Release without deleting the other platform's asset.
-
-## Project scope
-
-This is a newly written remake based on inspection of the original Android game and a user-supplied reference APK.
-
-The repository does not distribute the original APK, recovered source code, extracted music, or copied proprietary artwork. The code, UI, graphics, effects, and synthesized audio in this project are newly created for the remake.
 
 ## Developer
 
