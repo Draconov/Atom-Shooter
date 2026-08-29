@@ -20,11 +20,13 @@ const dist2 = (a, b) => {
 const rnd = (min, max) => min + Math.random() * (max - min);
 
 export function getCollectionWindow(atomicNumber) {
-  // User-requested modernization kept intentionally: early atoms get a full
-  // minute, then the window eases down to 20 seconds at element 118.
-  if (atomicNumber <= 10) return 60;
-  const progress = clamp((atomicNumber - 10) / 108, 0, 1);
-  return Math.round(60 - 40 * Math.pow(progress, 0.82));
+  // User-requested modernization kept intentionally: elements 1–10 receive a
+  // full minute, then the post-core survival window eases down continuously
+  // to the 20-second minimum at element 118.
+  const z = clamp(Math.round(Number(atomicNumber) || 1), 1, 118);
+  if (z <= 10) return 60;
+  const progress = (z - 10) / (118 - 10);
+  return clamp(Math.round(60 - 40 * Math.pow(progress, 0.82)), 20, 60);
 }
 
 export function getCollectionResolution({ timeLeft, collected, total }) {
@@ -72,6 +74,13 @@ export class AtomGame {
     this.marathonThresholds = getMarathonThresholds(100);
     this.marathonPersistClock = 0;
     this.emptySoundCooldown = 0;
+    this.handleVisibilityChange = () => {
+      // requestAnimationFrame pauses in hidden tabs. Reset the clock when the
+      // game becomes visible again so time spent away from the game does not
+      // consume the active collection window in one giant frame.
+      if (!document.hidden && this.running && !this.paused) this.last = performance.now();
+    };
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
     this.bindDesktop();
   }
 
@@ -322,9 +331,20 @@ export class AtomGame {
 
   loop(time) {
     if (!this.running || this.paused) return;
-    const dt = Math.min(0.033, (time - this.last) / 1000 || 0.016);
+
+    // Keep gameplay clocks tied to real active time rather than frame count.
+    // Slow frames are split into stable <=33 ms simulation steps, so a
+    // 60-second collection window still lasts 60 seconds at 20/30/60 FPS.
+    const rawElapsed = (time - this.last) / 1000;
+    let remaining = Math.min(0.5, Number.isFinite(rawElapsed) && rawElapsed > 0 ? rawElapsed : 0.016);
     this.last = time;
-    this.update(dt);
+
+    while (remaining > 1e-6 && this.running && !this.paused) {
+      const dt = Math.min(0.033, remaining);
+      this.update(dt);
+      remaining -= dt;
+    }
+
     this.draw();
     if (this.running && !this.paused) this.raf = requestAnimationFrame((next) => this.loop(next));
   }

@@ -6,6 +6,7 @@
 - Added finite weapon energy, per-shot energy use, regeneration, and projectile limits.
 - Added temporary Ammo, Big Fire, Collector Boost, Electron Stop, Ghost, and Gravity Off power-ups.
 - Kept the modern post-core dual-win rule: collect all blue neutrons immediately or survive until the 60→20 second timer expires.
+- Made the 60→20 second collection timer frame-rate independent: slower rendering is sub-stepped instead of stretching the countdown, while hidden tabs do not consume active play time.
 - Added richer procedural electron-hit, collection, nucleus-split, thruster, and ship-destruction effects.
 
 ### Shop and progression
@@ -32,6 +33,8 @@
 - Added weapon-energy HUD, active power-up timers, and Marathon next-life indicator.
 - Expanded Tutorial messaging to cover the reference ship/border, aiming, shooting, electron collection, nucleus/proton/neutron, gravity, power-up, and alternate-control beats.
 - Expanded shop cards with the reference-style weapon/ship/engine/module statistics and added the “You can now afford” result hint.
+- Ensured shop artwork is fully contained inside every item card instead of being clipped at the preview edges.
+- Replaced stale browser favicon URLs with cache-breaking flat-icon assets and refreshed the in-app About panel with concise game, updates/downloads, and developer links.
 
 ### Distribution
 - Added a native Android WebView shell that packages the same canonical `web/` game used by GitHub Pages and Windows.

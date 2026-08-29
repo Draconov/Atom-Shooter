@@ -748,7 +748,22 @@ function closeModal() {
 function showAbout() {
   showModal(
     'About Atom Shooter',
-    `<p>This is a clean-room browser/desktop recreation of the 2013 arcade concept: pilot a nano ship, strip electrons from all 118 elements, crack the nucleus, collect particles and build an increasingly capable loadout.</p><p>Version 1.2.0 restores the reference game's deeper upgrade trees, weapon-energy system, temporary power-ups, Marathon life progression, run history and alternate touch controls while keeping the modern two-path post-core objective.</p><p>All code, graphics and synthesized audio in this repository are newly created. The original APK, recovered source, music and proprietary art are not distributed here.</p>`,
+    `<div class="about-content">
+      <section class="about-section">
+        <h3>About the game</h3>
+        <p><b>Atom Shooter</b> is an independent modern remake of the original 2013 Android game. Pilot a nano ship through all 118 elements, strip their electrons, break the nucleus, collect particles and upgrade your loadout.</p>
+      </section>
+      <section class="about-section">
+        <h3>Updates & downloads</h3>
+        <p>Get the newest Windows and Android builds, plus release notes, from the official GitHub Releases page.</p>
+        <a class="about-link" href="https://github.com/Draconov/Atom-Shooter/releases/latest" target="_blank" rel="noreferrer">Download latest release ↗</a>
+      </section>
+      <section class="about-section">
+        <h3>Developer</h3>
+        <p>Developed and maintained by <b>Draconov</b>.</p>
+        <a class="about-link secondary" href="https://github.com/Draconov" target="_blank" rel="noreferrer">About the developer ↗</a>
+      </section>
+    </div>`,
     [{ label: 'Close', primary: true, fn: closeModal }],
   );
 }

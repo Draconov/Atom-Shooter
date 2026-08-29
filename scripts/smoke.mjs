@@ -92,7 +92,17 @@ for (let z = 1; z <= 118; z += 1) {
 
 assert(getCollectionWindow(1) === 60, 'Hydrogen should allow 60 seconds after the split');
 assert(getCollectionWindow(10) === 60, 'Neon should still allow 60 seconds after the split');
+assert(getCollectionWindow(20) === 54, 'Element 20 should be on the descending timer curve');
+assert(getCollectionWindow(40) === 46, 'Element 40 should be on the descending timer curve');
+assert(getCollectionWindow(60) === 39, 'Element 60 should be on the descending timer curve');
+assert(getCollectionWindow(80) === 32, 'Element 80 should be on the descending timer curve');
+assert(getCollectionWindow(100) === 26, 'Element 100 should be on the descending timer curve');
 assert(getCollectionWindow(118) === 20, 'Element 118 should allow the 20 second minimum');
+assert(getCollectionWindow(999) === 20, 'Collection timer must clamp values above the periodic table to 20 seconds');
+assert(getCollectionWindow(-5) === 60, 'Collection timer must clamp invalid low element numbers to the easy-level maximum');
+for (let z = 11; z <= 108; z += 1) {
+  assert(getCollectionWindow(z + 10) < getCollectionWindow(z), `Collection window should be meaningfully lower ten levels later (${z} -> ${z + 10})`);
+}
 assert(getCollectionResolution({ timeLeft: 47, collected: 1, total: 3 }) === null, 'Partial blue collection must keep the collection phase running');
 assert(getCollectionResolution({ timeLeft: 47, collected: 3, total: 3 }) === 'complete', 'Collecting every blue neutron must complete the level immediately');
 assert(getCollectionResolution({ timeLeft: 0, collected: 0, total: 3 }) === 'complete', 'Surviving until timer expiry must complete the level');
@@ -107,6 +117,9 @@ const requiredFiles = [
   'web/assets/icon.svg',
   'web/assets/icon-192.png',
   'web/assets/icon-512.png',
+  'web/assets/atom-shooter-favicon.ico',
+  'web/assets/atom-shooter-icon-192.png',
+  'web/assets/atom-shooter-icon-512.png',
   ...SHIPS.map((item) => `web/assets/ships/${item.id}.png`),
   ...new Set(WEAPONS.map((item) => `web/assets/weapons/${item.asset}.png`)),
   ...new Set(ENGINES.map((item) => `web/assets/engines/${item.asset}.png`)),
@@ -197,6 +210,14 @@ const migratedModuleLoadout = mergeSave({
 });
 assert(migratedModuleLoadout.selectedModules.includes('fastfire'), 'Equipped legacy Q-Ray module must retain its projectile-speed effect through FastFire migration');
 assert(migratedModuleLoadout.selectedModules.includes('lowgrav'), 'Unrelated legacy modules must remain equipped when slots allow');
+
+
+const indexSource = fs.readFileSync('web/index.html', 'utf8');
+assert(indexSource.includes('atom-shooter-favicon.ico?v=120-flat'), 'Website must use the cache-breaking flat favicon');
+assert(indexSource.includes('atom-shooter-icon-192.png?v=120-flat'), 'Website must use the cache-breaking flat app icon');
+assert(appSource.includes('github.com/Draconov/Atom-Shooter/releases/latest'), 'About must link to latest releases');
+assert(appSource.includes('github.com/Draconov'), 'About must link to the developer profile');
+assert(appSource.includes('original 2013 Android game'), 'About must identify the original Android game as the remake source');
 
 const workflow = fs.readFileSync('.github/workflows/windows.yml', 'utf8');
 assert(workflow.includes('Atom-Shooter.exe'), 'Windows workflow must publish Atom-Shooter.exe');
