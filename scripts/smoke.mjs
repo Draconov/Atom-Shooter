@@ -11,7 +11,7 @@ import {
 } from '../web/src/data.js';
 import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon } from '../web/src/game.js';
 import { AudioSystem } from '../web/src/audio.js';
-import { DEFAULT_SAVE, mergeSave, normalizeMarathonState } from '../web/src/save.js';
+import { DEFAULT_SAVE, SAVE_SCHEMA, loadSave, normalizeSave, normalizeMarathonState } from '../web/src/save.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -194,50 +194,55 @@ assert(appSource.includes("className: 'pause-controls'"), 'Pause menu must expos
 assert((appSource.match(/className: 'pause-game'/g) || []).length === 3, 'Pause menu must contain exactly three game-action buttons');
 assert(appSource.includes("label: 'Restart'"), 'Pause menu restart action must use the compact Restart label');
 
-const migrated = mergeSave({
-  version: 2,
-  best: { 1: 1234 },
+const rejectedLegacy = normalizeSave({
+  version: SAVE_SCHEMA - 1,
+  unlocked: 118,
+  electrons: 999999,
   purchased: {
-    ships: ['pico', 'nano2'],
-    weapons: ['blaster2', 'railgun'],
-    engines: ['project1', 'project3'],
-    modules: ['projectile', 'lowgrav'],
+    ships: ['nano2'],
+    weapons: ['railgun'],
+    engines: ['project3'],
+    modules: ['projectile'],
   },
   selectedShip: 'nano2',
   selectedWeapon: 'railgun',
   selectedEngine: 'project3',
-  selectedModules: ['projectile', 'lowgrav'],
 });
-assert(migrated.version === 3, 'Pre-1.2 save must migrate to schema 3');
-assert(migrated.selectedWeapon === 'blaster4', 'Legacy Railgun selection must migrate to Blaster 4000');
-assert(migrated.selectedEngine === 'vrocketdx', 'Legacy Project L3 engine selection must migrate to V-Rocket DX');
-assert(migrated.selectedModules.length === 0, 'Nano II migration must clear module slots');
-assert(migrated.purchased.engines.includes('qray'), 'Legacy Q-Ray module ownership must grant the correctly reclassified Q-Ray engine');
-assert(migrated.purchased.modules.includes('fastfire'), 'Legacy Q-Ray projectile-speed behavior must migrate to the FastFire family');
-assert(migrated.records[1].score === 1234, 'Legacy best score must migrate to detailed records');
+assert(rejectedLegacy.version === SAVE_SCHEMA, 'Rejected old saves must return the current schema');
+assert(rejectedLegacy.unlocked === DEFAULT_SAVE.unlocked, 'Old save schemas must start fresh instead of migrating progression');
+assert(rejectedLegacy.electrons === 0, 'Old save schemas must not carry currency forward');
+assert(rejectedLegacy.selectedWeapon === DEFAULT_SAVE.selectedWeapon, 'Old weapon IDs must not be translated forward');
+assert(rejectedLegacy.selectedEngine === DEFAULT_SAVE.selectedEngine, 'Old engine IDs must not be translated forward');
+assert(!rejectedLegacy.purchased.weapons.includes('blaster4'), 'Legacy Railgun must not migrate to Blaster 4000');
 
-const migratedModuleLoadout = mergeSave({
-  version: 2,
-  purchased: { ships: ['behemoth'], weapons: ['blaster2'], engines: ['project1'], modules: ['projectile', 'lowgrav'] },
-  selectedShip: 'behemoth',
-  selectedWeapon: 'blaster2',
-  selectedEngine: 'project1',
-  selectedModules: ['projectile', 'lowgrav'],
-});
-assert(migratedModuleLoadout.selectedModules.includes('fastfire'), 'Equipped legacy Q-Ray module must retain its projectile-speed effect through FastFire migration');
-assert(migratedModuleLoadout.selectedModules.includes('lowgrav'), 'Unrelated legacy modules must remain equipped when slots allow');
-
-
-const currentBlaster2000Save = mergeSave({
-  version: 3,
-  purchased: { ships: ['pico'], weapons: ['blaster2'], engines: ['vrocket'], modules: [] },
-  selectedShip: 'pico',
+const currentSave = normalizeSave({
+  ...structuredClone(DEFAULT_SAVE),
+  unlocked: 17,
+  electrons: 240,
+  neutrons: 19,
+  purchased: {
+    ships: ['pico', 'falcon'],
+    weapons: ['blaster', 'blaster2'],
+    engines: ['vrocket'],
+    modules: ['collector'],
+  },
+  selectedShip: 'falcon',
   selectedWeapon: 'blaster2',
   selectedEngine: 'vrocket',
-  selectedModules: [],
+  selectedModules: ['collector'],
 });
-assert(currentBlaster2000Save.selectedWeapon === 'blaster2', 'Existing 1.2.0 saves must keep Blaster 2000 equipped');
-assert(currentBlaster2000Save.purchased.weapons.includes('blaster'), 'Existing saves must receive the new base Blaster automatically');
+assert(currentSave.unlocked === 17, 'Current-schema saves must retain progression');
+assert(currentSave.selectedWeapon === 'blaster2', 'Current-schema saves must retain valid equipped weapons');
+assert(currentSave.selectedModules.includes('collector'), 'Current-schema saves must retain valid modules');
+
+const legacyStorage = {
+  getItem() {
+    return JSON.stringify({ version: SAVE_SCHEMA - 1, unlocked: 118, electrons: 999999 });
+  },
+};
+const loadedLegacy = loadSave(legacyStorage);
+assert(loadedLegacy.unlocked === DEFAULT_SAVE.unlocked && loadedLegacy.electrons === 0,
+  'loadSave must reset incompatible schemas rather than migrate them');
 
 
 const indexSource = fs.readFileSync('web/index.html', 'utf8');

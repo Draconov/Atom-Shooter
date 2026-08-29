@@ -407,7 +407,6 @@ function updateRecord(result) {
     time: !current.time ? time : (time ? Math.min(Number(current.time), time) : Number(current.time)),
     neutrons: Math.max(Number(current.neutrons) || 0, Number(result.neutrons) || 0),
   };
-  save.best[z] = Math.max(Number(save.best[z]) || 0, Number(result.levelScore) || 0);
   return previous;
 }
 

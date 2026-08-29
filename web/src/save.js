@@ -6,7 +6,6 @@ export const DEFAULT_SAVE = {
   version: SAVE_SCHEMA,
   unlocked: 1,
   completed: {},
-  best: {},
   records: {},
   electrons: 0,
   neutrons: 0,
@@ -35,33 +34,19 @@ export const DEFAULT_SAVE = {
 
 const CONTROL_MODES = new Set(['combined', 'split', 'dpad']);
 const CATEGORY_DATA = { ships: SHIPS, weapons: WEAPONS, engines: ENGINES, modules: MODULES };
-const OLD_ENGINE_MAP = {
-  project1: 'vrocket',
-  project2: 'vrocketx',
-  project3: 'vrocketdx',
-  vrocket: 'qray',
-  solar: 'solar',
-};
-const OLD_WEAPON_MAP = { railgun: 'blaster4' };
-const OLD_MODULE_MAP = {
-  collector: 'collector',
-  lowgrav: 'lowgrav',
-  fastfire: 'fastfire',
-  projectile: 'fastfire',
-  size: 'small',
-  slowel: 'slowel',
-  timewarp: 'timewarp',
-};
-
 const unique = (values) => [...new Set(values.filter(Boolean))];
 const validIds = (tab) => new Set(CATEGORY_DATA[tab].map((item) => item.id));
 
-function migrateIdArray(values, map, valid) {
-  return unique((values || []).map((id) => map[id] || id).filter((id) => valid.has(id)));
+function normalizeIdArray(values, valid) {
+  return unique((Array.isArray(values) ? values : []).filter((id) => valid.has(id)));
 }
 
 function ensureOwned(purchased, tab, id) {
   if (id && !purchased[tab].includes(id)) purchased[tab].push(id);
+}
+
+function plainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
 export function normalizeMarathonState(state, { allowDead = false } = {}) {
@@ -79,60 +64,33 @@ export function normalizeMarathonState(state, { allowDead = false } = {}) {
   };
 }
 
-export function mergeSave(stored) {
-  const incoming = stored && typeof stored === 'object' ? stored : {};
-  const oldSchema = Number(incoming.version ?? 1);
-  const isLegacy = oldSchema < SAVE_SCHEMA;
+export function normalizeSave(stored) {
+  if (!stored || typeof stored !== 'object' || Number(stored.version) !== SAVE_SCHEMA) {
+    return structuredClone(DEFAULT_SAVE);
+  }
 
   const purchased = {
-    ships: migrateIdArray(incoming.purchased?.ships, {}, validIds('ships')),
-    weapons: migrateIdArray(incoming.purchased?.weapons, isLegacy ? OLD_WEAPON_MAP : {}, validIds('weapons')),
-    engines: migrateIdArray(incoming.purchased?.engines, isLegacy ? OLD_ENGINE_MAP : {}, validIds('engines')),
-    modules: migrateIdArray(incoming.purchased?.modules, isLegacy ? OLD_MODULE_MAP : {}, validIds('modules')),
+    ships: normalizeIdArray(stored.purchased?.ships, validIds('ships')),
+    weapons: normalizeIdArray(stored.purchased?.weapons, validIds('weapons')),
+    engines: normalizeIdArray(stored.purchased?.engines, validIds('engines')),
+    modules: normalizeIdArray(stored.purchased?.modules, validIds('modules')),
   };
   for (const tab of Object.keys(purchased)) {
     purchased[tab] = unique([...DEFAULT_SAVE.purchased[tab], ...purchased[tab]]);
   }
 
-  // In 1.1.x Q-Ray was incorrectly implemented as a projectile-speed module.
-  // 1.2.0 restores Q-Ray to the engine chain. Preserve both the old module's
-  // functional benefit (FastFire = projectile velocity in the APK) and the
-  // named Q-Ray purchase when migrating an existing save.
-  const legacyQRayOwned = isLegacy && (
-    incoming.purchased?.modules?.includes?.('projectile')
-    || incoming.selectedModules?.includes?.('projectile')
-  );
-  if (legacyQRayOwned && !purchased.engines.includes('qray')) purchased.engines.push('qray');
-
-  const selectedShip = validIds('ships').has(incoming.selectedShip) ? incoming.selectedShip : DEFAULT_SAVE.selectedShip;
-  const migratedWeapon = isLegacy ? (OLD_WEAPON_MAP[incoming.selectedWeapon] || incoming.selectedWeapon) : incoming.selectedWeapon;
-  const migratedEngine = isLegacy ? (OLD_ENGINE_MAP[incoming.selectedEngine] || incoming.selectedEngine) : incoming.selectedEngine;
-  const selectedWeapon = validIds('weapons').has(migratedWeapon) ? migratedWeapon : DEFAULT_SAVE.selectedWeapon;
-  const selectedEngine = validIds('engines').has(migratedEngine) ? migratedEngine : DEFAULT_SAVE.selectedEngine;
+  const selectedShip = validIds('ships').has(stored.selectedShip) ? stored.selectedShip : DEFAULT_SAVE.selectedShip;
+  const selectedWeapon = validIds('weapons').has(stored.selectedWeapon) ? stored.selectedWeapon : DEFAULT_SAVE.selectedWeapon;
+  const selectedEngine = validIds('engines').has(stored.selectedEngine) ? stored.selectedEngine : DEFAULT_SAVE.selectedEngine;
 
   ensureOwned(purchased, 'ships', selectedShip);
   ensureOwned(purchased, 'weapons', selectedWeapon);
   ensureOwned(purchased, 'engines', selectedEngine);
 
-  const settings = { ...DEFAULT_SAVE.settings, ...(incoming.settings || {}) };
-  if ((incoming.version ?? 1) < 2) settings.music = true;
-  if (!CONTROL_MODES.has(settings.controlMode)) settings.controlMode = 'combined';
+  const settings = { ...DEFAULT_SAVE.settings, ...plainObject(stored.settings) };
+  if (!CONTROL_MODES.has(settings.controlMode)) settings.controlMode = DEFAULT_SAVE.settings.controlMode;
 
-  const records = { ...(incoming.records || {}) };
-  for (const [z, score] of Object.entries(incoming.best || {})) {
-    const current = records[z] || {};
-    records[z] = {
-      score: Math.max(Number(current.score) || 0, Number(score) || 0),
-      time: Math.max(0, Number(current.time) || 0),
-      neutrons: Math.max(0, Number(current.neutrons) || 0),
-    };
-  }
-
-  let selectedModules = migrateIdArray(
-    incoming.selectedModules,
-    isLegacy ? OLD_MODULE_MAP : {},
-    validIds('modules'),
-  );
+  let selectedModules = normalizeIdArray(stored.selectedModules, validIds('modules'));
   selectedModules.forEach((id) => ensureOwned(purchased, 'modules', id));
 
   const familySlots = new Map();
@@ -144,32 +102,33 @@ export function mergeSave(stored) {
   const ship = findById(SHIPS, selectedShip);
   selectedModules = ship.slots > 0 ? selectedModules.slice(0, ship.slots) : [];
 
-  const history = Array.isArray(incoming.marathonHistory)
-    ? incoming.marathonHistory.filter((run) => run && Number.isFinite(Number(run.score))).slice(-10)
+  const marathonHistory = Array.isArray(stored.marathonHistory)
+    ? stored.marathonHistory.filter((run) => run && Number.isFinite(Number(run.score))).slice(-10)
     : [];
 
   return {
-    ...structuredClone(DEFAULT_SAVE),
-    ...incoming,
     version: SAVE_SCHEMA,
+    unlocked: Math.max(1, Math.min(118, Math.floor(Number(stored.unlocked) || 1))),
+    completed: plainObject(stored.completed),
+    records: plainObject(stored.records),
+    electrons: Math.max(0, Math.floor(Number(stored.electrons) || 0)),
+    neutrons: Math.max(0, Math.floor(Number(stored.neutrons) || 0)),
     purchased,
     selectedShip,
     selectedWeapon,
     selectedEngine,
     selectedModules,
+    tutorialDone: Boolean(stored.tutorialDone),
+    marathonHistory,
+    marathonResume: normalizeMarathonState(stored.marathonResume),
     settings,
-    records,
-    completed: incoming.completed || {},
-    best: incoming.best || {},
-    marathonHistory: history,
-    marathonResume: normalizeMarathonState(incoming.marathonResume),
   };
 }
 
 export function loadSave(storage = globalThis.localStorage) {
   try {
     const stored = JSON.parse(storage?.getItem?.('atom-shooter-save') || 'null');
-    return stored ? mergeSave(stored) : structuredClone(DEFAULT_SAVE);
+    return stored ? normalizeSave(stored) : structuredClone(DEFAULT_SAVE);
   } catch {
     return structuredClone(DEFAULT_SAVE);
   }
