@@ -1,5 +1,5 @@
 export const MUSIC_TRACKS = Object.freeze({
-  menu: Object.freeze({ src: 'assets/audio/menu.wav', gain: 0.30 }),
+  menu: Object.freeze({ src: 'assets/audio/menu.wav', gain: 1.00 }),
   level: Object.freeze({ src: 'assets/audio/level-loop.wav', gain: 1.00 }),
   marathon: Object.freeze({ src: 'assets/audio/marathon-loop.wav', gain: 1.00 }),
 });

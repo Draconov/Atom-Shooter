@@ -178,7 +178,7 @@ assert(
 );
 
 assert(MUSIC_TRACKS.menu?.src === 'assets/audio/menu.wav', 'Menu OST path must point to the bundled menu track');
-assert(MUSIC_TRACKS.menu?.gain === 0.30, 'Menu OST must play at 30% of the gameplay music gain');
+assert(MUSIC_TRACKS.menu?.gain === 1.00, 'Menu OST must use the full selected music volume');
 assert(MUSIC_TRACKS.level?.src === 'assets/audio/level-loop.wav', 'Classic/Tutorial must use the ambient level loop');
 assert(MUSIC_TRACKS.marathon?.src === 'assets/audio/marathon-loop.wav', 'Marathon must use the faster remix loop');
 assert(fs.statSync('web/assets/audio/menu.wav').size > 100000, 'Menu OST asset is unexpectedly small');
