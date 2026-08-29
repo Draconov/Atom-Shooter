@@ -56,7 +56,7 @@ GitHub automatically adds its standard source-code ZIP/TAR downloads to every Re
 
 Version **1.2.0** is the parity update. The browser/Windows/Android recreation now restores the deeper systems found in the reference Android build instead of only reproducing the basic shoot-and-collect loop.
 
-- **9 weapon stages** arranged into the original three upgrade families.
+- **10 weapons** across three upgrade families, including a single-shot starter Blaster before Blaster 2000/3000/4000.
 - **5-stage engine progression** restored: V-Rocket through Solar Ex2.0.
 - **21 modules** across seven three-tier upgrade families.
 - Correct ship module-slot identities, including **Behemoth with four slots** and **Nano II with zero slots plus its built-in pickup field**.
@@ -102,15 +102,15 @@ Early atoms give a full **60 seconds** after the nucleus splits. Starting after 
 
 Weapons are now actual upgrade families rather than unrelated one-off purchases.
 
-| Family | Stage 1 | Stage 2 | Stage 3 |
-|---|---|---|---|
-| **Blaster** | Blaster 2000 | Blaster 3000 | Blaster 4000 |
-| **Gatling** | Gatling Gun | Gatling Gun P | Gatling Gun S |
-| **Burster** | Burster | Burster F | Burster R |
+| Family | Starter / Stage 1 | Stage 2 | Stage 3 | Stage 4 |
+|---|---|---|---|---|
+| **Blaster** | Blaster | Blaster 2000 | Blaster 3000 | Blaster 4000 |
+| **Gatling** | Gatling Gun | Gatling Gun P | Gatling Gun S | — |
+| **Burster** | Burster | Burster F | Burster R | — |
 
 Notable progression details:
 
-- Blasters move from **2 → 3 → 4 projectiles**; Blaster 4000 shots can penetrate two electrons.
+- The free starter **Blaster fires 1 projectile**, then the family upgrades through **2 → 3 → 4 projectiles** with Blaster 2000/3000/4000; Blaster 4000 shots can penetrate two electrons.
 - Gatling progresses from **6 → 10 → 20 rounds/sec**. Gatling Gun S trades per-hit damage for extreme fire rate and therefore needs two hits per electron.
 - Burster progresses from **5 → 7 → 10 projectiles** per burst with improved velocity, precision, and reload behavior.
 - Every weapon has a finite **energy capacity** and **regeneration rate**. Holding FIRE forever is no longer free.

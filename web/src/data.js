@@ -39,17 +39,19 @@ export const SHIPS = [
 ];
 
 const ENERGY = {
-  blaster2:{capacity:46,regen:17,cost:5}, blaster3:{capacity:52,regen:18,cost:6}, blaster4:{capacity:60,regen:20,cost:7},
+  blaster:{capacity:40,regen:16,cost:4}, blaster2:{capacity:46,regen:17,cost:5}, blaster3:{capacity:52,regen:18,cost:6}, blaster4:{capacity:60,regen:20,cost:7},
   gatling:{capacity:70,regen:24,cost:3.2}, gatlingp:{capacity:78,regen:27,cost:3.1}, gatlings:{capacity:90,regen:31,cost:2.8},
   burster:{capacity:58,regen:18,cost:12}, bursterf:{capacity:66,regen:22,cost:14}, bursterr:{capacity:76,regen:25,cost:17},
 };
 const weapon = (data) => ({continuous:true,bulletLimit:48,manualFire:true,pierce:1,...ENERGY[data.id],...data});
 
-// The APK uses three weapon families with three stages each.
+// Blaster has a basic one-projectile starter before the APK-style 2000/3000/4000 upgrades.
+// Gatling and Burster retain their three-stage reference progressions.
 export const WEAPONS = [
- weapon({id:'blaster2',family:'blaster',tier:1,asset:'blaster2',name:'Blaster 2000',costE:0,costN:0,rate:3.4,speed:650,life:1.0,bullets:2,spread:.035,size:5,damage:1,desc:'The first nano weapon ever created. Can shoot up to 2 particles.'}),
- weapon({id:'blaster3',family:'blaster',tier:2,asset:'blaster3',requires:'blaster2',name:'Blaster 3000',costE:55,costN:4,rate:3.7,speed:710,life:1.08,bullets:3,spread:.055,size:5.5,damage:1,desc:'Improved Blaster can shoot 3 particles with higher range and velocity.'}),
- weapon({id:'blaster4',family:'blaster',tier:3,asset:'blaster4',requires:'blaster3',name:'Blaster 4000',costE:130,costN:12,rate:4.2,speed:790,life:1.14,bullets:4,spread:.06,size:6,damage:1,pierce:2,desc:'Shoots up to 4 super fast particles. Each particle can destroy up to 2 electrons!'}),
+ weapon({id:'blaster',family:'blaster',tier:1,tierTotal:4,asset:'blaster',name:'Blaster',costE:0,costN:0,rate:3.0,speed:620,life:.95,bullets:1,spread:0,size:4.5,damage:1,desc:'The standard starter weapon. Fires one fast particle at a time.'}),
+ weapon({id:'blaster2',family:'blaster',tier:2,tierTotal:4,asset:'blaster2',requires:'blaster',name:'Blaster 2000',costE:30,costN:1,rate:3.4,speed:650,life:1.0,bullets:2,spread:.035,size:5,damage:1,desc:'Upgraded Blaster can shoot up to 2 particles at once.'}),
+ weapon({id:'blaster3',family:'blaster',tier:3,tierTotal:4,asset:'blaster3',requires:'blaster2',name:'Blaster 3000',costE:55,costN:4,rate:3.7,speed:710,life:1.08,bullets:3,spread:.055,size:5.5,damage:1,desc:'Improved Blaster can shoot 3 particles with higher range and velocity.'}),
+ weapon({id:'blaster4',family:'blaster',tier:4,tierTotal:4,asset:'blaster4',requires:'blaster3',name:'Blaster 4000',costE:130,costN:12,rate:4.2,speed:790,life:1.14,bullets:4,spread:.06,size:6,damage:1,pierce:2,desc:'Shoots up to 4 super fast particles. Each particle can destroy up to 2 electrons!'}),
  weapon({id:'gatling',family:'gatling',tier:1,asset:'gatling',name:'Gatling Gun',costE:210,costN:24,rate:6,speed:690,life:.9,bullets:1,spread:.075,size:4.2,damage:1,bulletLimit:60,desc:'Shooting 6 rounds per second is impressive, although it lacks a bit of precision.'}),
  weapon({id:'gatlingp',family:'gatling',tier:2,asset:'gatlingp',requires:'gatling',name:'Gatling Gun P',costE:320,costN:36,rate:10,speed:790,life:.94,bullets:1,spread:.04,size:4.1,damage:1,bulletLimit:72,desc:'Shoots 10 rounds per second. Increased precision and particle velocity.'}),
  weapon({id:'gatlings',family:'gatling',tier:3,asset:'gatlings',requires:'gatlingp',name:'Gatling Gun S',costE:470,costN:54,rate:20,speed:830,life:.95,bullets:1,spread:.025,size:4,damage:.5,bulletLimit:96,desc:'It takes 2 hits to destroy an electron — but with increased accuracy and 20 rounds per second it is hardly an issue.'}),

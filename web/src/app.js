@@ -160,7 +160,8 @@ function shopStats(tab, item) {
   if (tab === 'weapons') {
     const range = Math.round(item.speed * item.life);
     const trigger = item.continuous ? 'Continuous' : 'Manual burst';
-    return `<span class="chip">Tier ${item.tier}/3</span><span class="chip">${item.bullets} projectile${item.bullets === 1 ? '' : 's'}</span><span class="chip">${item.rate.toFixed(1)}/s</span><span class="chip">Speed ${Math.round(item.speed)}</span><span class="chip">Range ${range}</span><span class="chip">Damage ${item.damage}</span><span class="chip">Energy ${item.capacity}</span><span class="chip">Restore ${item.regen}/s</span><span class="chip">Limit ${item.bulletLimit}</span><span class="chip">${trigger}</span>`;
+    const tierTotal = item.tierTotal || 3;
+    return `<span class="chip">Tier ${item.tier}/${tierTotal}</span><span class="chip">${item.bullets} projectile${item.bullets === 1 ? '' : 's'}</span><span class="chip">${item.rate.toFixed(1)}/s</span><span class="chip">Speed ${Math.round(item.speed)}</span><span class="chip">Range ${range}</span><span class="chip">Damage ${item.damage}</span><span class="chip">Energy ${item.capacity}</span><span class="chip">Restore ${item.regen}/s</span><span class="chip">Limit ${item.bulletLimit}</span><span class="chip">${trigger}</span>`;
   }
   if (tab === 'engines') {
     const tier = ENGINES.indexOf(item) + 1;
@@ -204,7 +205,7 @@ function renderShop() {
       label = selected ? 'Equipped' : (shopTab === 'modules' ? 'Equip module' : 'Equip');
     }
 
-    const family = item.family ? `<span class="family-label">${item.family.toUpperCase()} • ${item.tier}/3</span>` : '';
+    const family = item.family ? `<span class="family-label">${item.family.toUpperCase()} • ${item.tier}/${item.tierTotal || 3}</span>` : '';
     card.innerHTML = `${itemPreviewMarkup(shopTab, item)}${family}<h3>${item.name}</h3><p>${item.desc}</p><div class="stats">${shopStats(shopTab, item)}</div><div class="price"><span><i class="e-dot"></i>${item.costE}</span><span><i class="n-dot"></i>${item.costN}</span></div><button class="${!owned ? 'primary' : ''}" ${disabled ? 'disabled' : ''}>${label}</button>`;
     card.querySelector('button').addEventListener('click', () => buyOrEquip(shopTab, item));
     root.appendChild(card);
@@ -578,10 +579,19 @@ function showPause() {
   const state = game.mode === 'marathon' ? game.getMarathonState() : null;
   showModal(
     'Game Paused',
-    `<p>${game.element.name} • Score ${game.score.toLocaleString()}${state ? ` • ${state.lives} ships` : ''}</p><p class="muted">Control mode: ${controlModeLabel(save.settings.controlMode)}</p>`,
+    `<p>${game.element.name} • Score ${game.score.toLocaleString()}${state ? ` • ${state.lives} ships` : ''}</p>`,
     [
       {
+        label: `Controls: ${controlModeLabel(save.settings.controlMode)}`,
+        className: 'pause-controls',
+        fn: () => {
+          nextControlMode();
+          showPause();
+        },
+      },
+      {
         label: 'Quit',
+        className: 'pause-game',
         fn: () => {
           game.stop();
           closeModal();
@@ -589,7 +599,8 @@ function showPause() {
         },
       },
       {
-        label: game.mode === 'marathon' ? 'Restart Marathon' : 'Restart',
+        label: 'Restart',
+        className: 'pause-game',
         fn: () => {
           closeModal();
           if (game.mode === 'marathon') {
@@ -601,17 +612,11 @@ function showPause() {
           }
         },
       },
-      {
-        label: `Controls: ${controlModeLabel(save.settings.controlMode)}`,
-        fn: () => {
-          nextControlMode();
-          showPause();
-        },
-      },
-      { label: 'Resume', primary: true, fn: () => { closeModal(); game.setPaused(false); } },
+      { label: 'Resume', primary: true, className: 'pause-game', fn: () => { closeModal(); game.setPaused(false); } },
     ],
     false,
   );
+  $('#modal').classList.add('pause-modal');
 }
 
 function runTutorial() {
@@ -723,6 +728,7 @@ function renderRecords() {
 
 function showModal(title, body, actions, allowBackdrop = true) {
   const modal = $('#modal');
+  modal.classList.remove('pause-modal');
   $('#modal-title').textContent = title;
   $('#modal-body').innerHTML = body;
   const actionRoot = $('#modal-actions');
@@ -732,6 +738,7 @@ function showModal(title, body, actions, allowBackdrop = true) {
     const button = document.createElement('button');
     button.textContent = action.label;
     if (action.primary) button.classList.add('primary');
+    if (action.className) button.classList.add(...action.className.split(/\s+/).filter(Boolean));
     button.addEventListener('click', action.fn);
     actionRoot.appendChild(button);
   }
@@ -741,7 +748,9 @@ function showModal(title, body, actions, allowBackdrop = true) {
 }
 
 function closeModal() {
-  $('#modal').classList.add('hidden');
+  const modal = $('#modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('pause-modal');
   $('#modal-actions').innerHTML = '';
 }
 

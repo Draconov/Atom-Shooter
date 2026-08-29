@@ -3,6 +3,7 @@
 ## 1.2.0 — APK parity update
 
 ### Gameplay
+- Added a true single-projectile starter **Blaster** before the Blaster 2000/3000/4000 upgrade chain.
 - Added finite weapon energy, per-shot energy use, regeneration, and projectile limits.
 - Added temporary Ammo, Big Fire, Collector Boost, Electron Stop, Ghost, and Gravity Off power-ups.
 - Kept the modern post-core dual-win rule: collect all blue neutrons immediately or survive until the 60→20 second timer expires.
@@ -10,7 +11,7 @@
 - Added richer procedural electron-hit, collection, nucleus-split, thruster, and ship-destruction effects.
 
 ### Shop and progression
-- Rebuilt weapons as three three-tier families: Blaster, Gatling, and Burster.
+- Rebuilt weapons around the three Blaster, Gatling, and Burster families; Blaster now also has a single-shot starter before the three reference 2000/3000/4000 stages.
 - Restored Gatling 6/10/20 rounds-per-second progression and Burster 5/7/10 projectile progression.
 - Replaced the old engine layout with V-Rocket → V-Rocket X → V-Rocket DX → Q-Ray → Solar Ex2.0.
 - Expanded modules from seven standalone items to seven three-tier families (21 upgrades total).
@@ -27,6 +28,7 @@
 - Added a dedicated Records screen.
 
 ### Controls and UI
+- Simplified the Pause dialog: removed the duplicate control-mode text, kept one dedicated Controls button, and placed Quit / Restart / Resume together on one row.
 - Added Shoot + Fly&Aim, Fly + Shoot + Aim, and D-pad touch modes.
 - Added control-mode switching in Options and Pause.
 - Added startup loading/splash screen with asset preloading.

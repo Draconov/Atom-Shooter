@@ -11,7 +11,7 @@ import {
 } from '../web/src/data.js';
 import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon } from '../web/src/game.js';
 import { AudioSystem } from '../web/src/audio.js';
-import { mergeSave, normalizeMarathonState } from '../web/src/save.js';
+import { DEFAULT_SAVE, mergeSave, normalizeMarathonState } from '../web/src/save.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -19,7 +19,7 @@ function assert(condition, message) {
 
 assert(ELEMENTS.length === 118, `Expected 118 elements, got ${ELEMENTS.length}`);
 assert(SHIPS.length === 6, `Expected 6 ships, got ${SHIPS.length}`);
-assert(WEAPONS.length === 9, `Expected 9 weapon upgrades, got ${WEAPONS.length}`);
+assert(WEAPONS.length === 10, `Expected starter Blaster plus 9 weapon upgrades, got ${WEAPONS.length}`);
 assert(ENGINES.length === 5, `Expected 5 engines, got ${ENGINES.length}`);
 assert(MODULES.length === 21, `Expected 21 module upgrades, got ${MODULES.length}`);
 assert(POWERUPS.length === 6, `Expected 6 temporary power-ups, got ${POWERUPS.length}`);
@@ -32,6 +32,14 @@ assert(
   ENGINES.map((engine) => engine.name).join('|') === 'V-Rocket|V-Rocket X|V-Rocket DX|Q-Ray|Solar Ex2.0',
   'Engine progression must match the reference five-stage family',
 );
+
+const starterBlaster = WEAPONS.find((weapon) => weapon.id === 'blaster');
+assert(starterBlaster?.name === 'Blaster', 'Base weapon must be named Blaster');
+assert(starterBlaster?.bullets === 1, 'Base Blaster must fire exactly one projectile');
+assert(starterBlaster?.costE === 0 && starterBlaster?.costN === 0, 'Base Blaster must be included for free');
+assert(DEFAULT_SAVE.selectedWeapon === 'blaster', 'New saves must equip the base Blaster');
+assert(DEFAULT_SAVE.purchased.weapons.includes('blaster'), 'New saves must own the base Blaster');
+assert(WEAPONS.find((weapon) => weapon.id === 'blaster2')?.requires === 'blaster', 'Blaster 2000 must upgrade from the base Blaster');
 
 const gatling = WEAPONS.filter((weapon) => weapon.family === 'gatling');
 assert(gatling.length === 3, 'Gatling family must contain three upgrades');
@@ -66,8 +74,12 @@ assert(!canFireWeapon({ activeBullets: 0, volleySize: 2, bulletLimit: 48, energy
 
 for (const family of ['blaster', 'gatling', 'burster']) {
   const items = WEAPONS.filter((item) => item.family === family);
+  const expectedCount = family === 'blaster' ? 4 : 3;
+  assert(items.length === expectedCount, `${family} must contain ${expectedCount} stages`);
   assert(items[0].requires == null, `${family} tier 1 must not require a prerequisite`);
-  assert(items[1].requires === items[0].id && items[2].requires === items[1].id, `${family} weapon tiers must unlock sequentially`);
+  for (let i = 1; i < items.length; i += 1) {
+    assert(items[i].requires === items[i - 1].id, `${family} weapon tiers must unlock sequentially`);
+  }
 }
 for (let i = 1; i < ENGINES.length; i += 1) assert(ENGINES[i].requires === ENGINES[i - 1].id, 'Engine stages must unlock sequentially');
 for (const modules of moduleFamilies.values()) {
@@ -177,6 +189,10 @@ const appSource = fs.readFileSync('web/src/app.js', 'utf8');
 assert(html.includes('id="shop-tutorial"'), 'Shop tutorial overlay must exist');
 assert(appSource.includes('marathonHistory'), 'App must expose Marathon history');
 assert(appSource.includes('marathonResume'), 'App must persist Marathon resume state');
+assert(!appSource.includes('Control mode: ${controlModeLabel(save.settings.controlMode)}'), 'Pause menu must not show a separate control-mode text line');
+assert(appSource.includes("className: 'pause-controls'"), 'Pause menu must expose one dedicated controls button');
+assert((appSource.match(/className: 'pause-game'/g) || []).length === 3, 'Pause menu must contain exactly three game-action buttons');
+assert(appSource.includes("label: 'Restart'"), 'Pause menu restart action must use the compact Restart label');
 
 const migrated = mergeSave({
   version: 2,
@@ -210,6 +226,18 @@ const migratedModuleLoadout = mergeSave({
 });
 assert(migratedModuleLoadout.selectedModules.includes('fastfire'), 'Equipped legacy Q-Ray module must retain its projectile-speed effect through FastFire migration');
 assert(migratedModuleLoadout.selectedModules.includes('lowgrav'), 'Unrelated legacy modules must remain equipped when slots allow');
+
+
+const currentBlaster2000Save = mergeSave({
+  version: 3,
+  purchased: { ships: ['pico'], weapons: ['blaster2'], engines: ['vrocket'], modules: [] },
+  selectedShip: 'pico',
+  selectedWeapon: 'blaster2',
+  selectedEngine: 'vrocket',
+  selectedModules: [],
+});
+assert(currentBlaster2000Save.selectedWeapon === 'blaster2', 'Existing 1.2.0 saves must keep Blaster 2000 equipped');
+assert(currentBlaster2000Save.purchased.weapons.includes('blaster'), 'Existing saves must receive the new base Blaster automatically');
 
 
 const indexSource = fs.readFileSync('web/index.html', 'utf8');
