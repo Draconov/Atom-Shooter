@@ -64,6 +64,10 @@ export function isShipInsideCore({ x, y, r = 0 }, coreRadius = CORE_EXCLUSION_RA
   return distance < Math.max(0, Number(coreRadius) || CORE_EXCLUSION_RADIUS) + Math.max(0, Number(r) || 0);
 }
 
+export function isCoreLethalPhase(phase) {
+  return phase !== 'post';
+}
+
 export function getNucleusDamageStage({ orbiting = 0, total = 0, phase = 'electrons' } = {}) {
   if (phase === 'post') return 'exploded';
   if (phase === 'unstable') return 'unstable';
@@ -719,7 +723,7 @@ export class AtomGame {
       this.challengeMetrics.electronClearTime ??= this.elapsed;
       this.unstableDuration = 1.25 * this.elementBehavior.instabilityTime;
       this.explosionTimer = this.unstableDuration;
-      this.slowMoTimer = .42;
+      this.slowMoTimer = .8;
       this.hooks.onObjective?.('The nucleus is unstable…');
       this.pushParticle({ x:500, y:500, ttl:.5, type:'ring', radius:32, growth:280, color:'#ef355d' });
       for (let i = 0; i < 18; i += 1) {
@@ -801,12 +805,14 @@ export class AtomGame {
       }
     }
 
-    // The innermost visible orbit is a hard safety boundary in every phase.
-    // Crossing it is fatal even with spawn invulnerability or Ghost active.
-    // Use the post-movement position so high-speed inward movement cannot get
-    // a free frame inside the core.
-    const coreRadius = this.shellRadii[0] || CORE_EXCLUSION_RADIUS;
-    if (isShipInsideCore(ship, coreRadius)) this.damageShip('core', { bypassProtection: true });
+    // The innermost visible orbit is lethal only while the nucleus still
+    // exists. Once the core explodes and collection begins, its former area
+    // becomes safe to fly through. Before that, the boundary bypasses Ghost
+    // and temporary spawn invulnerability.
+    if (isCoreLethalPhase(this.phase)) {
+      const coreRadius = this.shellRadii[0] || CORE_EXCLUSION_RADIUS;
+      if (isShipInsideCore(ship, coreRadius)) this.damageShip('core', { bypassProtection: true });
+    }
   }
 
   updateElectronPositions(dt) {
@@ -1476,16 +1482,17 @@ export class AtomGame {
       const blobs = clamp(Math.round(Math.sqrt(this.element.z) * 2), 4, 20);
       const stage = getNucleusDamageStage({ orbiting:this.orbitingRemaining, total:this.electrons.length, phase:this.phase });
       const stageLevel = stage === 'intact' ? 0 : stage === 'cracked' ? 1 : stage === 'heavily-cracked' ? 2 : 3;
-      const instabilityPulse = stageLevel >= 3 ? Math.sin(this.elapsed * 10.5) * .065 : 0;
-      const pulse = 1 + instabilityPulse + (this.phase === 'unstable' ? Math.sin(this.explosionTimer * 26) * .055 : 0);
+      const instabilityPulse = stageLevel >= 3 ? Math.sin(this.elapsed * 9.2) * .055 : 0;
+      const pulse = 1 + instabilityPulse + (this.phase === 'unstable' ? Math.sin(this.explosionTimer * 24) * .045 : 0);
+      const seed = this.element.z * .173;
 
-      // Persistent red hazard glow while the intact nucleus still occupies the lethal core.
-      // The warning intensifies with visual damage but does not affect gameplay.
-      const warningPulse = .72 + Math.sin(this.elapsed * (4.6 + stageLevel * .7)) * .18;
-      const warningGlowRadius = radius + 25 + stageLevel * 4 + Math.sin(this.elapsed * 3.6) * 5;
-      const glow = c.createRadialGradient(500, 500, radius * .25, 500, 500, warningGlowRadius);
-      glow.addColorStop(0, `rgba(239,53,93,${.13 + warningPulse * .08 + stageLevel * .025})`);
-      glow.addColorStop(.5, `rgba(239,53,93,${.09 + warningPulse * .06 + stageLevel * .02})`);
+      // Persistent red hazard glow while the unsplit nucleus still occupies the lethal core.
+      // This is only a danger/readability cue; the visual damage stages never alter gameplay.
+      const warningPulse = .72 + Math.sin(this.elapsed * (4.4 + stageLevel * .55)) * .16;
+      const warningGlowRadius = radius + 24 + stageLevel * 3 + Math.sin(this.elapsed * 3.4) * 4;
+      const glow = c.createRadialGradient(500, 500, radius * .2, 500, 500, warningGlowRadius);
+      glow.addColorStop(0, `rgba(239,53,93,${.12 + warningPulse * .075 + stageLevel * .018})`);
+      glow.addColorStop(.52, `rgba(239,53,93,${.08 + warningPulse * .052 + stageLevel * .015})`);
       glow.addColorStop(1, 'rgba(239,53,93,0)');
       c.fillStyle = glow;
       c.beginPath();
@@ -1493,71 +1500,171 @@ export class AtomGame {
       c.fill();
 
       c.beginPath();
-      c.arc(500, 500, radius + 11 + stageLevel * 1.5 + Math.sin(this.elapsed * 4.4) * 2.2, 0, TAU);
-      c.strokeStyle = `rgba(239,53,93,${.32 + warningPulse * .18 + stageLevel * .07})`;
-      c.lineWidth = 4.5 + stageLevel * .55;
+      c.arc(500, 500, radius + 11 + Math.sin(this.elapsed * 4.2) * 1.8, 0, TAU);
+      c.strokeStyle = `rgba(239,53,93,${.32 + warningPulse * .17 + stageLevel * .045})`;
+      c.lineWidth = 4.5 + stageLevel * .35;
       c.stroke();
 
+      // Exposed heat under the shell becomes visible only once the nucleus is seriously fractured.
+      if (stageLevel >= 2) {
+        const hotRadius = radius * (.72 + stageLevel * .06);
+        const hot = c.createRadialGradient(500, 500, radius * .06, 500, 500, hotRadius);
+        hot.addColorStop(0, stageLevel >= 3 ? 'rgba(255,247,220,.72)' : 'rgba(255,176,74,.34)');
+        hot.addColorStop(.36, stageLevel >= 3 ? 'rgba(255,94,66,.42)' : 'rgba(239,53,93,.18)');
+        hot.addColorStop(1, 'rgba(239,53,93,0)');
+        c.fillStyle = hot;
+        c.beginPath();
+        c.arc(500, 500, hotRadius, 0, TAU);
+        c.fill();
+      }
+
+      // Draw the nucleons as coherent shell plates. Heavy stages separate the plates slightly
+      // rather than scribbling arbitrary lines over the surface.
       for (let i = 0; i < blobs; i += 1) {
         const angle = i * 2.399;
-        const radial = (i % 4) / 4 * radius * 0.55;
-        const fractureOffset = stageLevel >= 2 ? Math.sin(i * 11.7 + this.element.z) * stageLevel * 1.7 : 0;
-        const x = 500 + Math.cos(angle) * (radial + fractureOffset);
-        const y = 500 + Math.sin(angle) * (radial + fractureOffset);
+        const radial = (i % 4) / 4 * radius * .55;
+        const plateGroup = i % 4;
+        const separation = stageLevel === 1 ? .65 : stageLevel === 2 ? 2.4 : stageLevel >= 3 ? 4.4 : 0;
+        const separationAngle = seed + plateGroup * (TAU / 4) + Math.sin(i * 1.7) * .12;
+        const edgeFactor = .42 + radial / Math.max(1, radius);
+        const x = 500 + Math.cos(angle) * radial + Math.cos(separationAngle) * separation * edgeFactor;
+        const y = 500 + Math.sin(angle) * radial + Math.sin(separationAngle) * separation * edgeFactor;
+        const blobRadius = clamp(radius * .28, 9, 16) * pulse;
+
+        c.save();
+        c.shadowBlur = stageLevel >= 3 ? 8 : 0;
+        c.shadowColor = i % 2 ? 'rgba(239,53,93,.42)' : 'rgba(42,168,216,.38)';
         c.beginPath();
-        c.arc(x, y, clamp(radius * 0.28, 9, 16) * pulse, 0, TAU);
+        c.arc(x, y, blobRadius, 0, TAU);
         c.fillStyle = i % 2 ? '#ef355d' : '#2aa8d8';
         c.fill();
+        c.shadowBlur = 0;
+        c.strokeStyle = stageLevel >= 2 ? 'rgba(25,40,56,.58)' : 'rgba(255,255,255,.28)';
+        c.lineWidth = stageLevel >= 2 ? 1.55 : 1.1;
+        c.stroke();
+
+        // Small consistent highlight gives the nucleus the same finished, toy-like surface as the UI art.
+        c.beginPath();
+        c.arc(x - blobRadius * .28, y - blobRadius * .3, Math.max(1.2, blobRadius * .16), 0, TAU);
+        c.fillStyle = 'rgba(255,255,255,.28)';
+        c.fill();
+        c.restore();
+      }
+
+      // Clean fracture seams: curved, clipped, deterministic paths with a dark crevice and a
+      // narrow hot inner edge. They remain inside the nucleus and grow with electron removal.
+      if (stageLevel >= 1) {
+        const crackCount = stageLevel === 1 ? 2 : stageLevel === 2 ? 4 : 6;
+        c.save();
+        c.beginPath();
+        c.arc(500, 500, radius * .94, 0, TAU);
+        c.clip();
+        c.lineCap = 'round';
+        c.lineJoin = 'round';
+
+        for (let i = 0; i < crackCount; i += 1) {
+          const angle = seed + i * (TAU / crackCount) + (i % 2 ? .13 : -.09);
+          const bend = (i % 2 ? 1 : -1) * (.12 + stageLevel * .025);
+          const r0 = radius * (.06 + (i % 3) * .025);
+          const r1 = radius * (.34 + stageLevel * .035);
+          const r2 = radius * (.62 + stageLevel * .045);
+          const r3 = radius * (.78 + stageLevel * .045);
+          const p = (rr, aa) => [500 + Math.cos(aa) * rr, 500 + Math.sin(aa) * rr];
+          const a = p(r0, angle - bend * .35);
+          const b = p(r1, angle + bend);
+          const d = p(r2, angle - bend * .7);
+          const e = p(r3, angle + bend * .4);
+
+          c.beginPath();
+          c.moveTo(a[0], a[1]);
+          c.bezierCurveTo(b[0], b[1], d[0], d[1], e[0], e[1]);
+          c.strokeStyle = stageLevel >= 3 ? 'rgba(38,20,27,.92)' : 'rgba(29,39,50,.88)';
+          c.lineWidth = 4.2 + stageLevel * 1.15;
+          c.shadowBlur = stageLevel >= 2 ? 5 + stageLevel * 2 : 0;
+          c.shadowColor = 'rgba(255,71,66,.48)';
+          c.stroke();
+          c.shadowBlur = 0;
+
+          c.beginPath();
+          c.moveTo(a[0], a[1]);
+          c.bezierCurveTo(b[0], b[1], d[0], d[1], e[0], e[1]);
+          c.strokeStyle = stageLevel === 1
+            ? 'rgba(255,164,126,.42)'
+            : stageLevel === 2
+              ? 'rgba(255,108,72,.72)'
+              : 'rgba(255,232,194,.9)';
+          c.lineWidth = 1.25 + stageLevel * .5;
+          c.stroke();
+
+          if (stageLevel >= 2 && i % 2 === 0) {
+            const branchStart = p(radius * .48, angle - bend * .2);
+            const branchEnd = p(radius * (.64 + stageLevel * .04), angle + bend * 1.7);
+            c.beginPath();
+            c.moveTo(branchStart[0], branchStart[1]);
+            c.quadraticCurveTo(
+              500 + Math.cos(angle + bend) * radius * .56,
+              500 + Math.sin(angle + bend) * radius * .56,
+              branchEnd[0], branchEnd[1],
+            );
+            c.strokeStyle = 'rgba(34,31,39,.8)';
+            c.lineWidth = 2.6 + stageLevel * .45;
+            c.stroke();
+            c.beginPath();
+            c.moveTo(branchStart[0], branchStart[1]);
+            c.quadraticCurveTo(
+              500 + Math.cos(angle + bend) * radius * .56,
+              500 + Math.sin(angle + bend) * radius * .56,
+              branchEnd[0], branchEnd[1],
+            );
+            c.strokeStyle = stageLevel >= 3 ? 'rgba(255,202,163,.74)' : 'rgba(255,105,76,.46)';
+            c.lineWidth = 1.05;
+            c.stroke();
+          }
+        }
+        c.restore();
+      }
+
+      // A few clean shell chips sell the heavily-cracked/unstable stages without visual clutter.
+      if (stageLevel >= 2) {
+        const chipCount = stageLevel === 2 ? 3 : 5;
+        for (let i = 0; i < chipCount; i += 1) {
+          const angle = seed * .7 + i * (TAU / chipCount) + .22;
+          const rr = radius + 6 + stageLevel * 2 + (i % 2) * 3;
+          const x = 500 + Math.cos(angle) * rr;
+          const y = 500 + Math.sin(angle) * rr;
+          const tangent = angle + Math.PI / 2;
+          const size = 3.2 + stageLevel * .8 + (i % 2);
+          c.beginPath();
+          c.moveTo(x + Math.cos(angle) * size, y + Math.sin(angle) * size);
+          c.lineTo(x + Math.cos(tangent) * size * .7, y + Math.sin(tangent) * size * .7);
+          c.lineTo(x - Math.cos(tangent) * size * .55, y - Math.sin(tangent) * size * .55);
+          c.closePath();
+          c.fillStyle = i % 2 ? '#ef355d' : '#2aa8d8';
+          c.fill();
+          c.strokeStyle = 'rgba(255,255,255,.55)';
+          c.lineWidth = 1;
+          c.stroke();
+        }
       }
 
       c.beginPath();
       c.arc(500, 500, (radius + 5) * pulse, 0, TAU);
-      c.strokeStyle = stageLevel >= 3 ? 'rgba(239,53,93,.95)' : 'rgba(255,255,255,.7)';
-      c.lineWidth = 3 + stageLevel * .45;
+      c.strokeStyle = stageLevel >= 3 ? 'rgba(255,126,126,.96)' : 'rgba(255,255,255,.72)';
+      c.lineWidth = 3 + stageLevel * .4;
       c.stroke();
-
-      if (stageLevel >= 1) {
-        const crackCount = stageLevel === 1 ? 3 : stageLevel === 2 ? 7 : 10;
-        c.lineCap = 'round';
-        for (let i = 0; i < crackCount; i += 1) {
-          const angle = i * (TAU / crackCount) + this.element.z * .173;
-          const length = radius * (stageLevel === 1 ? .48 : stageLevel === 2 ? .7 : .88);
-          c.beginPath();
-          for (let step = 0; step < 5; step += 1) {
-            const rr = radius * .08 + length * (step / 4);
-            const jitter = Math.sin(i * 9.1 + step * 13.7) * radius * (.035 + stageLevel * .015);
-            const x = 500 + Math.cos(angle) * rr + Math.cos(angle + Math.PI / 2) * jitter;
-            const y = 500 + Math.sin(angle) * rr + Math.sin(angle + Math.PI / 2) * jitter;
-            if (step === 0) c.moveTo(x, y); else c.lineTo(x, y);
-          }
-          c.strokeStyle = stageLevel >= 3 ? 'rgba(255,244,218,.9)' : `rgba(33,48,60,${.5 + stageLevel * .14})`;
-          c.lineWidth = 1.5 + stageLevel * .75;
-          c.stroke();
-        }
-      }
-
-      if (stageLevel >= 2) {
-        c.fillStyle = `rgba(28,37,45,${stageLevel === 2 ? .18 : .28})`;
-        for (let i = 0; i < stageLevel + 1; i += 1) {
-          const angle = i * 2.17 + this.element.z * .11;
-          c.beginPath();
-          c.arc(500 + Math.cos(angle) * radius * .34, 500 + Math.sin(angle) * radius * .34, radius * (.08 + i * .018), 0, TAU);
-          c.fill();
-        }
-      }
 
       if (stageLevel >= 3) {
         const duration = Math.max(.01, this.unstableDuration || 1.25);
-        const progress = this.phase === 'unstable' ? clamp(1 - this.explosionTimer / duration, 0, 1) : .32;
-        c.strokeStyle = `rgba(255,255,255,${.35 + progress * .55})`;
-        c.lineWidth = 2.1;
-        for (let i = 0; i < 6; i += 1) {
-          const angle = i * 1.047 + this.element.z * .137;
-          c.beginPath();
-          c.moveTo(500 + Math.cos(angle) * radius * .12, 500 + Math.sin(angle) * radius * .12);
-          c.lineTo(500 + Math.cos(angle + .09) * radius * (.58 + progress * .23), 500 + Math.sin(angle + .09) * radius * (.58 + progress * .23));
-          c.stroke();
-        }
+        const progress = this.phase === 'unstable' ? clamp(1 - this.explosionTimer / duration, 0, 1) : .28;
+        const coreRadius = radius * (.18 + progress * .09);
+        c.save();
+        c.shadowBlur = 15 + progress * 18;
+        c.shadowColor = 'rgba(255,78,65,.88)';
+        c.beginPath();
+        c.arc(500, 500, coreRadius, 0, TAU);
+        c.fillStyle = `rgba(255,242,214,${.45 + progress * .45})`;
+        c.fill();
+        c.restore();
       }
     }
 

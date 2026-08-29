@@ -10,7 +10,7 @@ import {
   getElectronShellCounts,
   getMarathonThresholds,
 } from '../web/src/data.js';
-import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon, CORE_EXCLUSION_RADIUS, isShipInsideCore, getNucleusDamageStage } from '../web/src/game.js';
+import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon, CORE_EXCLUSION_RADIUS, isShipInsideCore, isCoreLethalPhase, getNucleusDamageStage } from '../web/src/game.js';
 import { AudioSystem, MUSIC_TRACKS } from '../web/src/audio.js';
 import { DEFAULT_SAVE, SAVE_SCHEMA, loadSave, normalizeSave, normalizeMarathonState } from '../web/src/save.js';
 import {
@@ -132,6 +132,9 @@ assert(CORE_EXCLUSION_RADIUS === 86, 'The core death boundary must match the inn
 assert(isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS, r: 13 }), 'A ship hull crossing the inner orbit must be inside the lethal core zone');
 assert(!isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS + 13, r: 13 }), 'A ship whose hull only touches the inner orbit must remain safe');
 assert(!isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS + 40, r: 13 }), 'A ship outside the inner orbit must remain safe');
+assert(isCoreLethalPhase('electrons'), 'The core must remain lethal during the electron phase');
+assert(isCoreLethalPhase('unstable'), 'The core must remain lethal during nucleus instability');
+assert(!isCoreLethalPhase('post'), 'The exploded core area must be safe during collection');
 assert(getNucleusDamageStage({orbiting:100,total:100,phase:'electrons'}) === 'intact', 'Fresh nucleus must render intact');
 assert(getNucleusDamageStage({orbiting:70,total:100,phase:'electrons'}) === 'cracked', 'Electron removal must visually crack the nucleus');
 assert(getNucleusDamageStage({orbiting:30,total:100,phase:'electrons'}) === 'heavily-cracked', 'Deep electron removal must produce heavy cracks');
@@ -282,14 +285,15 @@ assert(appSource.includes('function renderCodex()'), 'App must expose the elemen
 assert(appSource.includes('function applyChallengeRewards(result)'), 'Classic completion must process optional challenge medals and rewards');
 
 const gameSource = fs.readFileSync('web/src/game.js', 'utf8');
-assert(gameSource.includes("damageShip('core', { bypassProtection: true })"), 'Crossing the inner orbit must cause unavoidable core death');
+assert(gameSource.includes('if (isCoreLethalPhase(this.phase))'), 'Core death must be disabled after the nucleus explodes');
+assert(gameSource.includes("damageShip('core', { bypassProtection: true })"), 'Crossing the inner orbit before explosion must cause unavoidable core death');
 assert(gameSource.includes('getElementBehavior'), 'Game must apply element-specific behavior profiles');
 assert(gameSource.includes('updateHazards(dt)'), 'Game must simulate radioactive/Marathon proton hazards');
 assert(gameSource.includes('challengeStates(true)'), 'Game completion must evaluate optional challenge outcomes');
 assert(gameSource.includes('marathonModifier'), 'Game must apply Marathon modifiers');
 assert(gameSource.includes('muzzleFlash()') && gameSource.includes('shieldHit('), 'Renderer must include expanded weapon/shield feedback');
 assert(gameSource.includes('fireLaser(') && gameSource.includes('fireArc(') && gameSource.includes('firePulse('), 'Game must implement direct mechanics for new 1.4 weapons');
-assert(gameSource.includes('slowMoTimer = .42'), 'Final electron clear must trigger the short slow-motion destruction beat');
+assert(gameSource.includes('slowMoTimer = .8'), 'Final electron clear must trigger the 0.8-second slow-motion destruction beat');
 assert(gameSource.includes('Persistent red hazard glow'), 'Unsplit lethal core must render its red warning glow');
 assert(!gameSource.includes("this.phase === 'strip'") && !gameSource.includes('this.t *'), 'Core warning glow must use live phase/time state instead of stale identifiers');
 const audioSource = fs.readFileSync('web/src/audio.js', 'utf8');
