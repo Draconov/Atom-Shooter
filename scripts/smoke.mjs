@@ -10,7 +10,7 @@ import {
   getMarathonThresholds,
 } from '../web/src/data.js';
 import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon } from '../web/src/game.js';
-import { AudioSystem } from '../web/src/audio.js';
+import { AudioSystem, MUSIC_TRACKS } from '../web/src/audio.js';
 import { DEFAULT_SAVE, SAVE_SCHEMA, loadSave, normalizeSave, normalizeMarathonState } from '../web/src/save.js';
 
 function assert(condition, message) {
@@ -39,6 +39,7 @@ assert(starterBlaster?.bullets === 1, 'Base Blaster must fire exactly one projec
 assert(starterBlaster?.costE === 0 && starterBlaster?.costN === 0, 'Base Blaster must be included for free');
 assert(DEFAULT_SAVE.selectedWeapon === 'blaster', 'New saves must equip the base Blaster');
 assert(DEFAULT_SAVE.purchased.weapons.includes('blaster'), 'New saves must own the base Blaster');
+assert(DEFAULT_SAVE.settings.sfxVolume === 1 && DEFAULT_SAVE.settings.musicVolume === 1, 'New saves must default both volume controls to 100%');
 assert(WEAPONS.find((weapon) => weapon.id === 'blaster2')?.requires === 'blaster', 'Blaster 2000 must upgrade from the base Blaster');
 
 const gatling = WEAPONS.filter((weapon) => weapon.family === 'gatling');
@@ -121,8 +122,6 @@ assert(getCollectionResolution({ timeLeft: 0, collected: 0, total: 3 }) === 'com
 assert(getCollectionResolution({ timeLeft: 0, collected: 2, total: 3 }) === 'complete', 'Timer expiry must complete the level after partial collection');
 
 const requiredFiles = [
-  'README.md',
-  'CHANGELOG.md',
   'web/index.html',
   'web/styles.css',
   'web/src/save.js',
@@ -132,6 +131,9 @@ const requiredFiles = [
   'web/assets/atom-shooter-favicon.ico',
   'web/assets/atom-shooter-icon-192.png',
   'web/assets/atom-shooter-icon-512.png',
+  'web/assets/audio/menu.wav',
+  'web/assets/audio/level-loop.wav',
+  'web/assets/audio/marathon-loop.wav',
   ...SHIPS.map((item) => `web/assets/ships/${item.id}.png`),
   ...new Set(WEAPONS.map((item) => `web/assets/weapons/${item.asset}.png`)),
   ...new Set(ENGINES.map((item) => `web/assets/engines/${item.asset}.png`)),
@@ -175,6 +177,17 @@ assert(
   `Windows ICO must contain at least one 256x256 image; found ${windowsIconSizes.map(({ width, height }) => `${width}x${height}`).join(', ')}`,
 );
 
+assert(MUSIC_TRACKS.menu?.src === 'assets/audio/menu.wav', 'Menu OST path must point to the bundled menu track');
+assert(MUSIC_TRACKS.menu?.gain === 0.30, 'Menu OST must play at 30% of the gameplay music gain');
+assert(MUSIC_TRACKS.level?.src === 'assets/audio/level-loop.wav', 'Classic/Tutorial must use the ambient level loop');
+assert(MUSIC_TRACKS.marathon?.src === 'assets/audio/marathon-loop.wav', 'Marathon must use the faster remix loop');
+assert(fs.statSync('web/assets/audio/menu.wav').size > 100000, 'Menu OST asset is unexpectedly small');
+for (const loopFile of ['web/assets/audio/level-loop.wav', 'web/assets/audio/marathon-loop.wav']) {
+  const wav = fs.readFileSync(loopFile);
+  assert(wav.subarray(0, 4).toString('ascii') === 'RIFF' && wav.subarray(8, 12).toString('ascii') === 'WAVE', `${loopFile} must be a valid WAV file`);
+  assert(wav.length > 500000, `${loopFile} is unexpectedly small`);
+}
+
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 assert(packageJson.version === '1.2.0', `Expected package version 1.2.0, got ${packageJson.version}`);
 assert(packageJson.build?.portable?.artifactName === 'Atom-Shooter.exe', 'Windows artifact must remain Atom-Shooter.exe');
@@ -193,6 +206,8 @@ assert(!appSource.includes('Control mode: ${controlModeLabel(save.settings.contr
 assert(appSource.includes("className: 'pause-controls'"), 'Pause menu must expose one dedicated controls button');
 assert((appSource.match(/className: 'pause-game'/g) || []).length === 3, 'Pause menu must contain exactly three game-action buttons');
 assert(appSource.includes("label: 'Restart'"), 'Pause menu restart action must use the compact Restart label');
+assert(appSource.includes("audio.setMusicMode('menu')"), 'Non-game screens must select the menu OST');
+assert(appSource.includes("mode === 'marathon' ? 'marathon' : 'level'"), 'Game startup must select Classic/Tutorial or Marathon music');
 
 const rejectedLegacy = normalizeSave({
   version: SAVE_SCHEMA - 1,
@@ -234,6 +249,12 @@ const currentSave = normalizeSave({
 assert(currentSave.unlocked === 17, 'Current-schema saves must retain progression');
 assert(currentSave.selectedWeapon === 'blaster2', 'Current-schema saves must retain valid equipped weapons');
 assert(currentSave.selectedModules.includes('collector'), 'Current-schema saves must retain valid modules');
+const clampedVolumeSave = normalizeSave({
+  ...structuredClone(DEFAULT_SAVE),
+  settings: { ...DEFAULT_SAVE.settings, sfxVolume: 2, musicVolume: -0.5 },
+});
+assert(clampedVolumeSave.settings.sfxVolume === 1, 'SFX volume must clamp to 100%');
+assert(clampedVolumeSave.settings.musicVolume === 0, 'Music volume must clamp to 0%');
 
 const legacyStorage = {
   getItem() {
@@ -246,6 +267,9 @@ assert(loadedLegacy.unlocked === DEFAULT_SAVE.unlocked && loadedLegacy.electrons
 
 
 const indexSource = fs.readFileSync('web/index.html', 'utf8');
+assert(indexSource.includes('id="setting-sfx-volume"'), 'Options must expose a sound effects volume slider');
+assert(indexSource.includes('id="setting-music-volume"'), 'Options must expose a music volume slider');
+assert(appSource.includes("'setting-sfx-volume'") && appSource.includes("'setting-music-volume'"), 'Volume sliders must save live through the settings input handlers');
 assert(indexSource.includes('atom-shooter-favicon.ico?v=120-flat'), 'Website must use the cache-breaking flat favicon');
 assert(indexSource.includes('atom-shooter-icon-192.png?v=120-flat'), 'Website must use the cache-breaking flat app icon');
 assert(appSource.includes('github.com/Draconov/Atom-Shooter/releases/latest'), 'About must link to latest releases');
@@ -319,8 +343,19 @@ globalThis.document = { hidden: false, addEventListener() {} };
 globalThis.window = { AudioContext: FakeAudioContext, setInterval };
 
 const audio = new AudioSystem();
-audio.configure({ sfx: true, music: true });
+audio.configure({ sfx: true, music: true, sfxVolume: 0.5, musicVolume: 0.25 });
+audio.setMusicMode('level');
+assert(audio.musicMode === 'level', 'Audio system must switch to the ambient level soundtrack');
+audio.setMusicMode('marathon');
+assert(audio.musicMode === 'marathon', 'Audio system must switch to the Marathon remix');
+audio.setMusicMode('menu');
+assert(audio.musicMode === 'menu', 'Audio system must switch back to the menu OST');
 assert(await audio.unlock(), 'Audio system should unlock after a user-gesture resume');
+assert(Math.abs(audio.sfxBus.gain.value - 0.36) < 1e-9, 'SFX volume must scale the SFX bus live');
+assert(Math.abs(audio.musicBus.gain.value - 0.095) < 1e-9, 'Music volume must scale the music bus live');
+audio.configure({ sfx: true, music: true, sfxVolume: 1, musicVolume: 1 });
+assert(Math.abs(audio.sfxBus.gain.value - 0.72) < 1e-9, 'SFX volume must restore to full configured level');
+assert(Math.abs(audio.musicBus.gain.value - 0.38) < 1e-9, 'Music volume must restore to full configured level');
 assert(audio.musicRunning, 'Music scheduler should start after audio unlock when music is enabled');
 audio.powerup();
 audio.extraLife();

@@ -213,6 +213,10 @@ button.danger, .danger { color: #b22949; }
 .setting-row small { color: var(--muted); }
 .setting-row input[type=checkbox] { width: 24px; height: 24px; }
 .setting-row input[type=range] { width: min(260px, 44vw); }
+
+.volume-control { display: flex !important; grid-template-columns: none !important; align-items: center; gap: 10px; }
+.volume-control input[type=range] { width: min(220px, 38vw); }
+.volume-control output { min-width: 44px; text-align: right; color: var(--ink); font-size: 12px; font-weight: 800; }
 select { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px; }
 .settings-buttons { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; padding: 16px 0; }
 

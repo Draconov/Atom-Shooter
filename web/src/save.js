@@ -25,6 +25,8 @@ export const DEFAULT_SAVE = {
   settings: {
     sfx: true,
     music: true,
+    sfxVolume: 1,
+    musicVolume: 1,
     side: 'right',
     stick: 'medium',
     deadzone: 0.38,
@@ -89,6 +91,10 @@ export function normalizeSave(stored) {
 
   const settings = { ...DEFAULT_SAVE.settings, ...plainObject(stored.settings) };
   if (!CONTROL_MODES.has(settings.controlMode)) settings.controlMode = DEFAULT_SAVE.settings.controlMode;
+  settings.sfx = Boolean(settings.sfx);
+  settings.music = Boolean(settings.music);
+  settings.sfxVolume = Math.max(0, Math.min(1, Number(settings.sfxVolume) || 0));
+  settings.musicVolume = Math.max(0, Math.min(1, Number(settings.musicVolume) || 0));
 
   let selectedModules = normalizeIdArray(stored.selectedModules, validIds('modules'));
   selectedModules.forEach((id) => ensureOwned(purchased, 'modules', id));

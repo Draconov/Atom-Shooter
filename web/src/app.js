@@ -82,6 +82,7 @@ function loadoutSlotMarkup(tab, item) {
 
 function showScreen(name) {
   currentScreen = name;
+  if (name !== 'game') audio.setMusicMode('menu');
   if (name !== 'shop') closeShopTutorial();
   $$('.screen').forEach((screen) => screen.classList.toggle('active', screen.dataset.screen === name));
   if (name === 'main') updateMain();
@@ -303,6 +304,7 @@ function renderLoadout() {
 }
 
 function startGame(index, mode, tutorial = false, marathonState = null) {
+  audio.setMusicMode(mode === 'marathon' ? 'marathon' : 'level');
   audio.unlock();
   clearInterval(tutorialTimer);
   gameContext = { index, mode, tutorial, marathonState: normalizeMarathonState(marathonState) };
@@ -780,6 +782,10 @@ function syncSettings() {
   const settings = save.settings;
   $('#setting-sfx').checked = settings.sfx;
   $('#setting-music').checked = settings.music;
+  $('#setting-sfx-volume').value = Math.round(settings.sfxVolume * 100);
+  $('#setting-music-volume').value = Math.round(settings.musicVolume * 100);
+  $('#setting-sfx-volume-value').textContent = `${Math.round(settings.sfxVolume * 100)}%`;
+  $('#setting-music-volume-value').textContent = `${Math.round(settings.musicVolume * 100)}%`;
   $('#setting-side').value = settings.side;
   $('#setting-stick').value = settings.stick;
   $('#setting-deadzone').value = settings.deadzone;
@@ -790,12 +796,16 @@ function saveSettings() {
   save.settings = {
     sfx: $('#setting-sfx').checked,
     music: $('#setting-music').checked,
+    sfxVolume: Number($('#setting-sfx-volume').value) / 100,
+    musicVolume: Number($('#setting-music-volume').value) / 100,
     side: $('#setting-side').value,
     stick: $('#setting-stick').value,
     deadzone: Number($('#setting-deadzone').value),
     controlMode: $('#setting-control').value,
   };
   if (!CONTROL_MODES.includes(save.settings.controlMode)) save.settings.controlMode = 'combined';
+  $('#setting-sfx-volume-value').textContent = `${Math.round(save.settings.sfxVolume * 100)}%`;
+  $('#setting-music-volume-value').textContent = `${Math.round(save.settings.musicVolume * 100)}%`;
   audio.configure(save.settings);
   if (save.settings.music) audio.unlock();
   persist();
@@ -868,7 +878,7 @@ $$('#shop-tabs button').forEach((button) => button.addEventListener('click', () 
   renderShop();
 }));
 
-for (const id of ['setting-sfx', 'setting-music', 'setting-side', 'setting-stick', 'setting-deadzone', 'setting-control']) {
+for (const id of ['setting-sfx', 'setting-sfx-volume', 'setting-music', 'setting-music-volume', 'setting-side', 'setting-stick', 'setting-deadzone', 'setting-control']) {
   $(`#${id}`).addEventListener('input', saveSettings);
 }
 
