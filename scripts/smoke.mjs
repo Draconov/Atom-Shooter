@@ -126,6 +126,30 @@ const requiredFiles = [
 ];
 for (const file of requiredFiles) assert(fs.existsSync(file), `Missing required file: ${file}`);
 
+function readIcoSizes(file) {
+  const data = fs.readFileSync(file);
+  assert(data.length >= 6, `${file} is not a valid ICO header`);
+  assert(data.readUInt16LE(0) === 0 && data.readUInt16LE(2) === 1, `${file} is not a Windows ICO file`);
+  const count = data.readUInt16LE(4);
+  assert(count > 0, `${file} contains no icon images`);
+  assert(data.length >= 6 + count * 16, `${file} has a truncated ICO directory`);
+  const sizes = [];
+  for (let index = 0; index < count; index += 1) {
+    const offset = 6 + index * 16;
+    sizes.push({
+      width: data[offset] === 0 ? 256 : data[offset],
+      height: data[offset + 1] === 0 ? 256 : data[offset + 1],
+    });
+  }
+  return sizes;
+}
+
+const windowsIconSizes = readIcoSizes('build/icon.ico');
+assert(
+  windowsIconSizes.some(({ width, height }) => width >= 256 && height >= 256),
+  `Windows ICO must contain at least one 256x256 image; found ${windowsIconSizes.map(({ width, height }) => `${width}x${height}`).join(', ')}`,
+);
+
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 assert(packageJson.version === '1.2.0', `Expected package version 1.2.0, got ${packageJson.version}`);
 assert(packageJson.build?.portable?.artifactName === 'Atom-Shooter.exe', 'Windows artifact must remain Atom-Shooter.exe');

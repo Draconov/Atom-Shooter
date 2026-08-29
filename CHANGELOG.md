@@ -48,3 +48,4 @@
 - Made the collect-all-blue victory resolve immediately inside the pickup frame, before any later proton collision can override it.
 - Serialized Windows Release publishing so an in-progress EXE upload is not cancelled by another ref.
 - Windows distribution remains a single portable `Atom-Shooter.exe`; Android adds one separate `Atom-Shooter.apk` asset.
+- Fixed the Windows `.ico` bundle to include a proper 256×256 entry required by `electron-builder`, and added a smoke regression check for Windows icon dimensions.
