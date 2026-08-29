@@ -40,6 +40,8 @@
         <div class="secondary-actions">
           <button data-action="shop">Shop</button>
           <button data-action="records">Records</button>
+          <button data-action="achievements">Achievements</button>
+          <button data-action="codex">Codex</button>
           <button data-action="options">Options</button>
           <button data-action="about">About</button>
         </div>
@@ -84,6 +86,22 @@
       <div id="records-content" class="records-content"></div>
     </section>
 
+    <section id="screen-achievements" class="screen" data-screen="achievements">
+      <header class="topbar">
+        <button class="icon-btn" data-action="home" aria-label="Back">←</button>
+        <div><p class="eyebrow">PROGRESS</p><h2>Achievements</h2></div><span></span>
+      </header>
+      <div id="achievements-content" class="achievement-grid"></div>
+    </section>
+
+    <section id="screen-codex" class="screen" data-screen="codex">
+      <header class="topbar">
+        <button class="icon-btn" data-action="home" aria-label="Back">←</button>
+        <div><p class="eyebrow">ELEMENT ARCHIVE</p><h2>Codex</h2></div><span></span>
+      </header>
+      <div id="codex-content" class="codex-grid"></div>
+    </section>
+
     <section id="screen-options" class="screen" data-screen="options">
       <header class="topbar">
         <button class="icon-btn" data-action="home" aria-label="Back">←</button>
@@ -95,6 +113,7 @@
         <label class="setting-row select-row"><span><b>Control mode</b></span><select id="setting-control"><option value="combined">Shoot + Fly&amp;Aim</option><option value="split">Fly + Shoot + Aim</option><option value="dpad">D-pad</option></select></label>
         <label class="setting-row select-row"><span><b>Control side</b></span><select id="setting-side"><option value="right">Right</option><option value="left">Left</option></select></label>
         <label class="setting-row select-row"><span><b>Joystick size</b></span><select id="setting-stick"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+        <label class="setting-row select-row"><span><b>Screen effects</b></span><select id="setting-effects"><option value="full">Full</option><option value="reduced">Reduced</option><option value="off">Off</option></select></label>
         <label class="setting-row"><span><b>Dead zone</b><small>How far the analog moves before thrust begins</small></span><input id="setting-deadzone" type="range" min="0.1" max="0.65" step="0.05" /></label>
         <div class="settings-buttons"><button data-action="reset-tutorial">Reset tutorial</button><button class="danger" data-action="reset-save">Reset all progress</button></div>
       </div>
@@ -114,6 +133,9 @@
       <div id="game-stage" class="game-stage">
         <canvas id="game-canvas" width="1000" height="1000" aria-label="Atom Shooter game field"></canvas>
         <div id="objective" class="objective"></div>
+        <div id="element-behavior" class="element-behavior hidden"></div>
+        <div id="marathon-modifier" class="marathon-modifier hidden"></div>
+        <aside id="challenge-panel" class="challenge-panel hidden" aria-live="polite"></aside>
         <div id="powerup-timers" class="powerup-timers" aria-live="polite"></div>
         <div id="tutorial-callout" class="tutorial-callout hidden"></div>
         <div id="touch-controls" class="touch-controls mode-combined" aria-label="Touch controls">

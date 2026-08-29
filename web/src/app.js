@@ -9,6 +9,12 @@ import {
 import { AudioSystem } from './audio.js';
 import { AtomGame } from './game.js';
 import { DEFAULT_SAVE, loadSave, normalizeMarathonState } from './save.js';
+import {
+  ACHIEVEMENTS,
+  getAchievementProgress,
+  evaluateAchievements,
+  getElementMetadata,
+} from './progression.js';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -45,14 +51,19 @@ const game = new AtomGame($('#game-canvas'), audio, {
   onHUD: updateHUD,
   onObjective: (text) => { $('#objective').textContent = text; },
   onCurrency: () => {
+    const unlocked = checkAchievements();
     persist();
     updateWallets();
+    notifyAchievements(unlocked);
   },
   onMessage: (message) => toast(message, 2600),
   onMarathonState: (state) => {
     if (game.mode !== 'marathon') return;
     save.marathonResume = normalizeMarathonState(state);
+    if (state?.runTime && save.stats) save.stats.marathonBestTime = Math.max(save.stats.marathonBestTime || 0, state.runTime);
+    const unlocked = checkAchievements();
     persist();
+    notifyAchievements(unlocked);
   },
   onPause: showPause,
   onComplete: levelComplete,
@@ -61,6 +72,21 @@ const game = new AtomGame($('#game-canvas'), audio, {
 
 function persist() {
   localStorage.setItem('atom-shooter-save', JSON.stringify(save));
+}
+
+function checkAchievements() {
+  return evaluateAchievements(save);
+}
+
+function notifyAchievements(unlocked) {
+  if (!unlocked?.length) return;
+  const names = unlocked.map((item) => item.title).join(', ');
+  toast(`Achievement unlocked: ${names}`, 3200);
+}
+
+function achievementMarkup(unlocked) {
+  if (!unlocked?.length) return '';
+  return `<div class="unlock-summary"><b>Achievement unlocked</b><span>${unlocked.map((item) => item.title).join(', ')}</span></div>`;
 }
 
 function getShopAssetPath(tab, itemOrId) {
@@ -90,6 +116,8 @@ function showScreen(name) {
   if (name === 'shop') renderShop();
   if (name === 'options') syncSettings();
   if (name === 'records') renderRecords();
+  if (name === 'achievements') renderAchievements();
+  if (name === 'codex') renderCodex();
   updateWallets();
 }
 
@@ -138,9 +166,10 @@ function renderTable() {
     button.style.gridColumn = element.col;
     button.style.gridRow = element.row;
     button.disabled = !open;
-    button.innerHTML = `<span class="z">${element.z}</span><b class="sym">${element.symbol}</b><span class="nm">${element.name}</span>`;
+    const medals = Array.isArray(save.challenges?.[element.z]?.completed) ? save.challenges[element.z].completed.length : 0;
+    button.innerHTML = `<span class="z">${element.z}</span><b class="sym">${element.symbol}</b><span class="nm">${element.name}</span>${medals ? `<span class="challenge-medals">${medals}/3</span>` : ''}`;
     button.title = open
-      ? `${element.z}. ${element.name}${done ? ` — ${save.completed[element.z]}★` : ''}${summary ? ` — ${summary}` : ''}`
+      ? `${element.z}. ${element.name}${done ? ` — ${save.completed[element.z]}★` : ''}${medals ? ` — ${medals}/3 challenges` : ''}${summary ? ` — ${summary}` : ''}`
       : 'Complete the previous element to unlock';
 
     if (open) button.addEventListener('click', () => startGame(element.z - 1, 'classic'));
@@ -287,9 +316,11 @@ function buyOrEquip(tab, item) {
     }
   }
 
+  const unlockedAchievements = checkAchievements();
   persist();
   renderShop();
   updateWallets();
+  notifyAchievements(unlockedAchievements);
 }
 
 function renderLoadout() {
@@ -387,6 +418,33 @@ function updateHUD(hud) {
     marathonNext.classList.add('hidden');
   }
 
+  const behavior = $('#element-behavior');
+  if (hud.elementBehavior?.tags?.length) {
+    behavior.classList.remove('hidden');
+    behavior.textContent = `${hud.elementBehavior.label}: ${hud.elementBehavior.description}`;
+  } else {
+    behavior.classList.add('hidden');
+    behavior.textContent = '';
+  }
+
+  const modifier = $('#marathon-modifier');
+  if (hud.marathonModifier) {
+    modifier.classList.remove('hidden');
+    modifier.innerHTML = `<b>${hud.marathonModifier.name}</b><span>${hud.marathonModifier.description}</span>`;
+  } else {
+    modifier.classList.add('hidden');
+    modifier.innerHTML = '';
+  }
+
+  const challengePanel = $('#challenge-panel');
+  if (hud.challenges?.length) {
+    challengePanel.classList.remove('hidden');
+    challengePanel.innerHTML = `<b>Challenges</b>${hud.challenges.map((challenge) => `<div class="challenge-line ${challenge.state}"><span><strong>${challenge.title}</strong><em>${challenge.description}</em></span><small>${challenge.state === 'complete' ? 'DONE' : challenge.state === 'failed' ? 'MISSED' : 'ACTIVE'}</small></div>`).join('')}`;
+  } else {
+    challengePanel.classList.add('hidden');
+    challengePanel.innerHTML = '';
+  }
+
   if (hud.phase === 'electrons') {
     $('#objective').textContent = `Shoot electrons • ${hud.orbiting} remaining`;
   } else if (hud.phase === 'post') {
@@ -436,6 +494,30 @@ function affordableItemsMarkup() {
   return `<p class="affordable-line"><b>You can now afford:</b> ${shown.join(', ')}${more}</p>`;
 }
 
+function applyChallengeRewards(result) {
+  if (!result.challengeResults?.length) return '';
+  const z = result.element.z;
+  const stored = save.challenges[z] && typeof save.challenges[z] === 'object' ? save.challenges[z] : { completed: [] };
+  const previous = new Set(Array.isArray(stored.completed) ? stored.completed : []);
+  const passed = result.challengeResults.filter((item) => item.state === 'complete');
+  const fresh = passed.filter((item) => !previous.has(item.id));
+  const completed = unique([...previous, ...passed.map((item) => item.id)]);
+  save.challenges[z] = { completed, medals: completed.length };
+
+  if (fresh.length) {
+    save.electrons += fresh.length * 50;
+    save.neutrons += fresh.length * 2;
+  }
+
+  const rows = result.challengeResults.map((item) => (
+    `<div class="challenge-result ${item.state}"><span><b>${item.title}</b><small>${item.description}</small></span><strong>${item.state === 'complete' ? 'Completed' : 'Missed'}</strong></div>`
+  )).join('');
+  const reward = fresh.length
+    ? `<p class="challenge-reward">New medals: ${fresh.length} • Bonus ${fresh.length * 50} electrons / ${fresh.length * 2} neutrons</p>`
+    : '';
+  return `<section class="challenge-results"><h3>Challenges</h3>${rows}${reward}</section>`;
+}
+
 function levelComplete(result) {
   if (result.mode === 'marathon') {
     const nextIndex = result.element.z < 118 ? result.element.z : null;
@@ -450,10 +532,11 @@ function levelComplete(result) {
 
     save.marathonResume = null;
     const comparison = finishMarathonRun(result.marathonState, true);
+    const unlockedAchievements = checkAchievements();
     persist();
     showModal(
       'Marathon Complete!',
-      `<p>You cleared all 118 elements.</p><p><b>${result.score.toLocaleString()} points</b> • ${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}`,
+      `<p>You cleared all 118 elements.</p><p><b>${result.score.toLocaleString()} points</b> • ${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}${achievementMarkup(unlockedAchievements)}`,
       [
         { label: 'Records', fn: () => { closeModal(); showScreen('records'); } },
         { label: 'Main menu', primary: true, fn: () => { closeModal(); showScreen('main'); } },
@@ -481,13 +564,19 @@ function levelComplete(result) {
   const previous = updateRecord(result);
   save.completed[result.element.z] = Math.max(save.completed[result.element.z] || 0, result.stars);
   save.unlocked = Math.max(save.unlocked, Math.min(118, result.element.z + 1));
+  if (save.stats) {
+    save.stats.levelsCompleted = Object.values(save.completed).filter(Boolean).length;
+    if ((result.challengeMetrics?.shotsFired || Infinity) <= 12) save.stats.lowShotClear = true;
+  }
+  const challengeMarkup = applyChallengeRewards(result);
+  const unlockedAchievements = checkAchievements();
   persist();
 
   const next = result.element.z < 118 ? result.element.z : null;
   const record = save.records[result.element.z];
   showModal(
     'Level Completed!',
-    `<p><b>${result.element.name}</b> destabilized.</p><p>${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)} &nbsp; ${formatTime(result.time)} &nbsp; Score ${result.levelScore.toLocaleString()} &nbsp; Neutrons ${result.neutrons}</p>${comparisonMarkup(previous, result.levelScore)}<p class="best-line">Best: ${record.score.toLocaleString()} pts • ${formatTime(record.time)} • ${record.neutrons} neutrons</p>${affordableItemsMarkup()}`,
+    `<p><b>${result.element.name}</b> destabilized.</p><p>${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)} &nbsp; ${formatTime(result.time)} &nbsp; Score ${result.levelScore.toLocaleString()} &nbsp; Neutrons ${result.neutrons}</p>${comparisonMarkup(previous, result.levelScore)}<p class="best-line">Best: ${record.score.toLocaleString()} pts • ${formatTime(record.time)} • ${record.neutrons} neutrons</p>${challengeMarkup}${achievementMarkup(unlockedAchievements)}${affordableItemsMarkup()}`,
     [
       { label: 'Main menu', fn: () => { closeModal(); showScreen('main'); } },
       ...(next !== null
@@ -517,6 +606,7 @@ function finishMarathonRun(state, completedAll = false) {
   };
   save.marathonHistory.push(run);
   save.marathonHistory = save.marathonHistory.slice(-10);
+  if (save.stats) save.stats.marathonBestTime = Math.max(save.stats.marathonBestTime || 0, normalized.runTime || 0);
 
   if (!previousBest) return '<p class="muted">This is your first recorded Marathon.</p>';
   const delta = run.score - previousBest.score;
@@ -531,10 +621,11 @@ function gameOver(result) {
   if (result.mode === 'marathon') {
     save.marathonResume = null;
     const comparison = finishMarathonRun(result.marathonState, false);
+    const unlockedAchievements = checkAchievements();
     persist();
     showModal(
       'Marathon Over!',
-      `<p>${explanation}</p><p>Score: <b>${result.score.toLocaleString()}</b> • Reached ${result.element.name}</p><p>${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}`,
+      `<p>${explanation}</p><p>Score: <b>${result.score.toLocaleString()}</b> • Reached ${result.element.name}</p><p>${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}${achievementMarkup(unlockedAchievements)}`,
       [
         { label: 'Main menu', fn: () => { closeModal(); showScreen('main'); } },
         { label: 'New Marathon', primary: true, fn: () => { closeModal(); startGame(0, 'marathon', false, null); } },
@@ -727,6 +818,31 @@ function renderRecords() {
     </section>`;
 }
 
+function renderAchievements() {
+  const root = $('#achievements-content');
+  root.innerHTML = ACHIEVEMENTS.map((achievement) => {
+    const unlocked = Boolean(save.achievements?.[achievement.id]);
+    const progress = getAchievementProgress(save, achievement);
+    const percent = Math.round(progress.target ? progress.current / progress.target * 100 : 0);
+    const progressLabel = achievement.id.startsWith('marathon-')
+      ? `${formatTime(progress.current)} / ${formatTime(progress.target)}`
+      : `${Math.round(progress.current).toLocaleString()} / ${Math.round(progress.target).toLocaleString()}`;
+    return `<article class="achievement-card ${unlocked ? 'unlocked' : 'locked'}"><div class="achievement-mark">${unlocked ? '✓' : ''}</div><div><small>${unlocked ? 'UNLOCKED' : 'IN PROGRESS'}</small><h3>${achievement.title}</h3><p>${achievement.description}</p><div class="achievement-progress"><i style="width:${Math.min(100, percent)}%"></i></div><span>${progressLabel}</span></div></article>`;
+  }).join('');
+}
+
+function renderCodex() {
+  const root = $('#codex-content');
+  root.innerHTML = ELEMENTS.map((element) => {
+    const unlocked = Boolean(save.completed?.[element.z]);
+    if (!unlocked) return `<article class="codex-card locked"><span class="codex-number">${element.z}</span><b>${element.symbol}</b><p>Complete ${element.name} to unlock.</p></article>`;
+    const metadata = getElementMetadata(element);
+    const record = save.records?.[element.z];
+    const mass = Number.isInteger(metadata.mass) && element.z >= 43 ? `[${metadata.mass}]` : metadata.mass;
+    return `<article class="codex-card"><header><span class="codex-number">${element.z}</span><b>${element.symbol}</b><h3>${element.name}</h3></header><dl><div><dt>Atomic mass</dt><dd>${mass}</dd></div><div><dt>Category</dt><dd>${metadata.category}</dd></div></dl><p>${metadata.fact}</p><footer>${record ? `Best ${Number(record.score || 0).toLocaleString()} pts • ${formatTime(record.time || 0)}` : 'Completed'}</footer></article>`;
+  }).join('');
+}
+
 function showModal(title, body, actions, allowBackdrop = true) {
   const modal = $('#modal');
   modal.classList.remove('pause-modal');
@@ -788,6 +904,7 @@ function syncSettings() {
   $('#setting-stick').value = settings.stick;
   $('#setting-deadzone').value = settings.deadzone;
   $('#setting-control').value = settings.controlMode;
+  $('#setting-effects').value = settings.effects || 'full';
 }
 
 function saveSettings() {
@@ -798,6 +915,7 @@ function saveSettings() {
     stick: $('#setting-stick').value,
     deadzone: Number($('#setting-deadzone').value),
     controlMode: $('#setting-control').value,
+    effects: $('#setting-effects').value,
   };
   if (!CONTROL_MODES.includes(save.settings.controlMode)) save.settings.controlMode = 'combined';
   $('#setting-sfx-volume-value').textContent = `${Math.round(save.settings.sfxVolume * 100)}%`;
@@ -848,6 +966,8 @@ $$('[data-action]').forEach((button) => button.addEventListener('click', () => {
   if (action === 'tutorial') startGame(0, 'tutorial', true, null);
   if (action === 'shop') showScreen('shop');
   if (action === 'records') showScreen('records');
+  if (action === 'achievements') showScreen('achievements');
+  if (action === 'codex') showScreen('codex');
   if (action === 'options') showScreen('options');
   if (action === 'about') showAbout();
   if (action === 'home') showScreen('main');
@@ -860,7 +980,7 @@ $$('[data-action]').forEach((button) => button.addEventListener('click', () => {
   if (action === 'reset-save') {
     showModal(
       'Reset all progress?',
-      '<p>This deletes unlocked elements, records, Marathon history, currency and purchases on this device.</p>',
+      '<p>This deletes unlocked elements, records, challenges, achievements, Marathon history, currency and purchases on this device.</p>',
       [
         { label: 'Cancel', fn: closeModal },
         { label: 'Reset', primary: true, fn: resetSave },
@@ -874,7 +994,7 @@ $$('#shop-tabs button').forEach((button) => button.addEventListener('click', () 
   renderShop();
 }));
 
-for (const id of ['setting-sfx-volume', 'setting-music-volume', 'setting-side', 'setting-stick', 'setting-deadzone', 'setting-control']) {
+for (const id of ['setting-sfx-volume', 'setting-music-volume', 'setting-side', 'setting-stick', 'setting-deadzone', 'setting-control', 'setting-effects']) {
   $(`#${id}`).addEventListener('input', saveSettings);
 }
 

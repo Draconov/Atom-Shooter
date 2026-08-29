@@ -30,6 +30,9 @@ export class AudioSystem {
     this.musicLoadPromises = new Map();
     this.musicRequestId = 0;
     this.visibilityBound = false;
+    this.reactiveTimer = null;
+    this.reactiveStep = 0;
+    this.gameplayState = { phase: 'electrons', electronFraction: 1, lives: 3, mode: 'classic' };
   }
 
   configure({ sfxVolume = 1, musicVolume = 1 }) {
@@ -103,6 +106,62 @@ export class AudioSystem {
       this.stopMusic(false);
       void this.startMusic();
     }
+  }
+
+  setGameplayState(state = {}) {
+    this.gameplayState = { ...this.gameplayState, ...state };
+    if (this.musicMode !== 'menu' && this.musicRunning) this.refreshReactiveLayer();
+  }
+
+  musicTone(freq = 220, duration = .08, type = 'sine', volume = .035, slide = 0) {
+    if (this.musicVolume <= 0 || this.musicMode === 'menu') return;
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running' || !this.musicBus) return;
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(freq, now);
+    if (slide) oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), now + duration);
+    gain.gain.setValueAtTime(Math.max(.0001, volume), now);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
+    oscillator.connect(gain);
+    gain.connect(this.musicBus);
+    oscillator.start(now);
+    oscillator.stop(now + duration + .02);
+  }
+
+  tickReactiveLayer() {
+    if (this.musicVolume <= 0 || document.hidden || this.musicMode === 'menu') return;
+    const state = this.gameplayState || {};
+    const step = this.reactiveStep++;
+    if (state.phase === 'unstable') {
+      const sequence = [220, 246.94, 293.66, 329.63];
+      this.musicTone(sequence[step % sequence.length], .17, 'triangle', .04, 70);
+      if (step % 2 === 0) this.musicTone(82.41, .08, 'square', .025, -12);
+      return;
+    }
+    if (state.phase === 'post') {
+      const bass = this.musicMode === 'marathon' ? [110, 146.83, 164.81, 146.83] : [82.41, 110, 123.47, 110];
+      this.musicTone(bass[step % bass.length], .12, 'square', .028);
+      if (step % 4 === 2) this.musicTone(440, .08, 'triangle', .022, 110);
+    } else if (Number(state.electronFraction) <= .2) {
+      this.musicTone(step % 2 ? 123.47 : 98, .055, 'square', .024);
+    }
+    if (Number(state.lives) <= 1 && step % 4 === 0) {
+      this.musicTone(65.41, .2, 'sawtooth', .018, -12);
+    }
+  }
+
+  refreshReactiveLayer() {
+    if (this.musicMode === 'menu' || !this.musicRunning || this.musicVolume <= 0) {
+      if (this.reactiveTimer !== null) clearInterval(this.reactiveTimer);
+      this.reactiveTimer = null;
+      return;
+    }
+    if (this.reactiveTimer !== null) return;
+    const interval = this.musicMode === 'marathon' ? 240 : 360;
+    this.reactiveTimer = window.setInterval(() => this.tickReactiveLayer(), interval);
   }
 
   async loadMusicBuffer(mode) {
@@ -245,6 +304,7 @@ export class AudioSystem {
     this.tickFallbackMusic();
     const interval = this.musicMode === 'marathon' ? 250 : 420;
     this.musicTimer = window.setInterval(() => this.tickFallbackMusic(), interval);
+    this.refreshReactiveLayer();
   }
 
   async startMusic() {
@@ -275,6 +335,7 @@ export class AudioSystem {
     this.musicSource = source;
     this.musicSourceGain = gain;
     this.musicRunning = true;
+    this.refreshReactiveLayer();
   }
 
   stopMusic(resetStep = true) {
@@ -283,6 +344,10 @@ export class AudioSystem {
     if (this.musicTimer !== null) {
       clearInterval(this.musicTimer);
       this.musicTimer = null;
+    }
+    if (this.reactiveTimer !== null) {
+      clearInterval(this.reactiveTimer);
+      this.reactiveTimer = null;
     }
 
     if (this.musicSource) {
@@ -296,6 +361,6 @@ export class AudioSystem {
     }
 
     this.musicRunning = false;
-    if (resetStep) this.musicStep = 0;
+    if (resetStep) { this.musicStep = 0; this.reactiveStep = 0; }
   }
 }

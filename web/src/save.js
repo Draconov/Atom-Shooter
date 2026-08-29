@@ -7,6 +7,16 @@ export const DEFAULT_SAVE = {
   unlocked: 1,
   completed: {},
   records: {},
+  challenges: {},
+  achievements: {},
+  stats: {
+    totalElectronsCollected: 0,
+    totalNeutronsCollected: 0,
+    totalShots: 0,
+    levelsCompleted: 0,
+    marathonBestTime: 0,
+    lowShotClear: false,
+  },
   electrons: 0,
   neutrons: 0,
   purchased: {
@@ -29,10 +39,12 @@ export const DEFAULT_SAVE = {
     stick: 'medium',
     deadzone: 0.38,
     controlMode: 'combined',
+    effects: 'full',
   },
 };
 
 const CONTROL_MODES = new Set(['combined', 'split', 'dpad']);
+const EFFECT_MODES = new Set(['full', 'reduced', 'off']);
 const CATEGORY_DATA = { ships: SHIPS, weapons: WEAPONS, engines: ENGINES, modules: MODULES };
 const unique = (values) => [...new Set(values.filter(Boolean))];
 const validIds = (tab) => new Set(CATEGORY_DATA[tab].map((item) => item.id));
@@ -61,6 +73,7 @@ export function normalizeMarathonState(state, { allowDead = false } = {}) {
     nextExtraIndex: Math.max(0, Math.floor(Number(state.nextExtraIndex) || 0)),
     runTime: Math.max(0, Number(state.runTime) || 0),
     runNeutrons: Math.max(0, Math.floor(Number(state.runNeutrons) || 0)),
+    seed: Math.max(0, Math.floor(Number(state.seed) || 0)),
   };
 }
 
@@ -91,6 +104,7 @@ export function normalizeSave(stored) {
   delete settings.sfx;
   delete settings.music;
   if (!CONTROL_MODES.has(settings.controlMode)) settings.controlMode = DEFAULT_SAVE.settings.controlMode;
+  if (!EFFECT_MODES.has(settings.effects)) settings.effects = DEFAULT_SAVE.settings.effects;
   settings.sfxVolume = Math.max(0, Math.min(1, Number(settings.sfxVolume) || 0));
   settings.musicVolume = Math.max(0, Math.min(1, Number(settings.musicVolume) || 0));
 
@@ -110,11 +124,24 @@ export function normalizeSave(stored) {
     ? stored.marathonHistory.filter((run) => run && Number.isFinite(Number(run.score))).slice(-10)
     : [];
 
+  const storedStats = { ...DEFAULT_SAVE.stats, ...plainObject(stored.stats) };
+  const stats = {
+    totalElectronsCollected: Math.max(0, Math.floor(Number(storedStats.totalElectronsCollected) || 0)),
+    totalNeutronsCollected: Math.max(0, Math.floor(Number(storedStats.totalNeutronsCollected) || 0)),
+    totalShots: Math.max(0, Math.floor(Number(storedStats.totalShots) || 0)),
+    levelsCompleted: Math.max(0, Math.floor(Number(storedStats.levelsCompleted) || 0)),
+    marathonBestTime: Math.max(0, Number(storedStats.marathonBestTime) || 0),
+    lowShotClear: Boolean(storedStats.lowShotClear),
+  };
+
   return {
     version: SAVE_SCHEMA,
     unlocked: Math.max(1, Math.min(118, Math.floor(Number(stored.unlocked) || 1))),
     completed: plainObject(stored.completed),
     records: plainObject(stored.records),
+    challenges: plainObject(stored.challenges),
+    achievements: plainObject(stored.achievements),
+    stats,
     electrons: Math.max(0, Math.floor(Number(stored.electrons) || 0)),
     neutrons: Math.max(0, Math.floor(Number(stored.neutrons) || 0)),
     purchased,

@@ -12,6 +12,17 @@ import {
 import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon } from '../web/src/game.js';
 import { AudioSystem, MUSIC_TRACKS } from '../web/src/audio.js';
 import { DEFAULT_SAVE, SAVE_SCHEMA, loadSave, normalizeSave, normalizeMarathonState } from '../web/src/save.js';
+import {
+  getElementMetadata,
+  getElementBehavior,
+  getElementChallenges,
+  getChallengeState,
+  MARATHON_MODIFIERS,
+  getMarathonModifier,
+  ACHIEVEMENTS,
+  getAchievementProgress,
+  evaluateAchievements,
+} from '../web/src/progression.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -23,6 +34,38 @@ assert(WEAPONS.length === 10, `Expected starter Blaster plus 9 weapon upgrades, 
 assert(ENGINES.length === 5, `Expected 5 engines, got ${ENGINES.length}`);
 assert(MODULES.length === 21, `Expected 21 module upgrades, got ${MODULES.length}`);
 assert(POWERUPS.length === 6, `Expected 6 temporary power-ups, got ${POWERUPS.length}`);
+assert(ACHIEVEMENTS.length >= 9, 'Achievement catalogue must cover progression, Marathon, collection and ownership milestones');
+assert(MARATHON_MODIFIERS.length === 8, 'Marathon must expose all eight procedural modifiers');
+assert(DEFAULT_SAVE.settings.effects === 'full', 'Screen effects must default to Full');
+assert(DEFAULT_SAVE.challenges && DEFAULT_SAVE.achievements && DEFAULT_SAVE.stats, 'Current save schema must include challenges, achievements and lifetime stats');
+
+for (const element of ELEMENTS) {
+  const metadata = getElementMetadata(element);
+  assert(Number.isFinite(Number(metadata.mass)), `Codex atomic mass missing for ${element.name}`);
+  assert(typeof metadata.category === 'string' && metadata.category.length > 0, `Codex category missing for ${element.name}`);
+  assert(typeof metadata.fact === 'string' && metadata.fact.length > 12, `Codex fact missing for ${element.name}`);
+  const challenges = getElementChallenges(element);
+  assert(challenges.length === 3, `${element.name} must expose exactly three optional challenges`);
+  assert(new Set(challenges.map((item) => item.id)).size === 3, `${element.name} challenge IDs must be unique`);
+}
+
+assert(getElementBehavior(3).electronSpeed > 1.3, 'Alkali metals must use faster, unstable electrons');
+assert(getElementBehavior(10).electronHp > 1, 'Noble gases must use more stable electron shells');
+assert(getElementBehavior(26).orbitEccentricity > 0, 'Transition metals must use denser/elliptical orbital motion');
+assert(getElementBehavior(92).protonInterval > 0, 'Radioactive elements must emit stray protons');
+assert(getElementBehavior(104).gravity > 1.3, 'Superheavy elements must increase nucleus gravity');
+assert(getElementBehavior(118).tags.includes('Superheavy') && getElementBehavior(118).tags.includes('Stable shell'), 'Oganesson must combine superheavy and noble-gas traits');
+
+const noLifeChallenge = { type:'no-life-loss' };
+assert(getChallengeState(noLifeChallenge, { livesLost:1 }, false) === 'failed', 'No-life-loss challenge must fail immediately after a life is lost');
+assert(getChallengeState(noLifeChallenge, { livesLost:0 }, true) === 'complete', 'No-life-loss challenge must complete on a clean finish');
+const timedChallenge = { type:'electron-time', target:30 };
+assert(getChallengeState(timedChallenge, { electronClearTime:25 }, true) === 'complete', 'Timed challenge must accept a clear under target');
+assert(getChallengeState(timedChallenge, { elapsed:31, electronClearTime:null }, false) === 'failed', 'Timed challenge must fail once its target expires');
+
+assert(getMarathonModifier(0, 42) === null && getMarathonModifier(1, 42) === null, 'Marathon modifiers must not occur on every element');
+assert(getMarathonModifier(2, 42)?.id === getMarathonModifier(2, 42)?.id, 'Marathon modifier selection must be deterministic for a run seed');
+for (let index = 2; index < 20; index += 3) assert(getMarathonModifier(index, 123), `Marathon element ${index + 1} should roll a modifier`);
 
 assert(SHIPS.find((ship) => ship.id === 'behemoth')?.slots === 4, 'Behemoth must have four module slots');
 assert(SHIPS.find((ship) => ship.id === 'nano2')?.slots === 0, 'Nano II must have zero module slots');
@@ -91,7 +134,9 @@ for (const modules of moduleFamilies.values()) {
 const allThresholds = getMarathonThresholds(100);
 assert(allThresholds.length === 100, 'Reference Marathon progression must contain 100 extra-ship thresholds');
 for (let i = 1; i < allThresholds.length; i += 1) assert(allThresholds[i] > allThresholds[i - 1], 'Marathon thresholds must increase monotonically');
-assert(normalizeMarathonState({ index: 7, score: 25000, lives: 2, nextExtraIndex: 2, runTime: 12.5, runNeutrons: 6 })?.index === 7, 'Valid Marathon resume state must survive normalization');
+const normalizedMarathon = normalizeMarathonState({ index: 7, score: 25000, lives: 2, nextExtraIndex: 2, runTime: 12.5, runNeutrons: 6, seed: 987654 });
+assert(normalizedMarathon?.index === 7, 'Valid Marathon resume state must survive normalization');
+assert(normalizedMarathon?.seed === 987654, 'Marathon run seed must survive resume normalization so modifiers do not reroll');
 assert(normalizeMarathonState({ index: 7, score: 25000, lives: 0 }) === null, 'Dead Marathon state must not be resumable');
 
 for (let z = 1; z <= 118; z += 1) {
@@ -125,6 +170,7 @@ const requiredFiles = [
   'web/index.html',
   'web/styles.css',
   'web/src/save.js',
+  'web/src/progression.js',
   'web/assets/icon.svg',
   'web/assets/icon-192.png',
   'web/assets/icon-512.png',
@@ -189,12 +235,12 @@ for (const loopFile of ['web/assets/audio/level-loop.wav', 'web/assets/audio/mar
 }
 
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-assert(packageJson.version === '1.2.0', `Expected package version 1.2.0, got ${packageJson.version}`);
+assert(packageJson.version === '1.3.0', `Expected package version 1.3.0, got ${packageJson.version}`);
 assert(packageJson.build?.portable?.artifactName === 'Atom-Shooter.exe', 'Windows artifact must remain Atom-Shooter.exe');
 JSON.parse(fs.readFileSync('web/manifest.webmanifest', 'utf8'));
 
 const html = fs.readFileSync('web/index.html', 'utf8');
-for (const id of ['screen-splash', 'setting-control', 'weapon-energy-fill', 'powerup-timers', 'aim-joystick', 'dpad-control', 'records-content']) {
+for (const id of ['screen-splash', 'setting-control', 'setting-effects', 'weapon-energy-fill', 'powerup-timers', 'aim-joystick', 'dpad-control', 'records-content', 'screen-achievements', 'achievements-content', 'screen-codex', 'codex-content', 'challenge-panel', 'element-behavior', 'marathon-modifier']) {
   assert(html.includes(`id="${id}"`), `Missing parity UI element #${id}`);
 }
 
@@ -208,6 +254,19 @@ assert((appSource.match(/className: 'pause-game'/g) || []).length === 3, 'Pause 
 assert(appSource.includes("label: 'Restart'"), 'Pause menu restart action must use the compact Restart label');
 assert(appSource.includes("audio.setMusicMode('menu')"), 'Non-game screens must select the menu OST');
 assert(appSource.includes("mode === 'marathon' ? 'marathon' : 'level'"), 'Game startup must select Classic/Tutorial or Marathon music');
+assert(appSource.includes('function renderAchievements()'), 'App must expose the Achievements screen');
+assert(appSource.includes('function renderCodex()'), 'App must expose the element Codex');
+assert(appSource.includes('function applyChallengeRewards(result)'), 'Classic completion must process optional challenge medals and rewards');
+
+const gameSource = fs.readFileSync('web/src/game.js', 'utf8');
+assert(gameSource.includes('getElementBehavior'), 'Game must apply element-specific behavior profiles');
+assert(gameSource.includes('updateHazards(dt)'), 'Game must simulate radioactive/Marathon proton hazards');
+assert(gameSource.includes('challengeStates(true)'), 'Game completion must evaluate optional challenge outcomes');
+assert(gameSource.includes('marathonModifier'), 'Game must apply Marathon modifiers');
+assert(gameSource.includes('muzzleFlash()') && gameSource.includes('shieldHit('), 'Renderer must include expanded weapon/shield feedback');
+const audioSource = fs.readFileSync('web/src/audio.js', 'utf8');
+assert(audioSource.includes('setGameplayState(state'), 'Audio system must accept reactive gameplay state');
+assert(audioSource.includes('tickReactiveLayer()'), 'Audio system must layer reactive gameplay music');
 
 const rejectedLegacy = normalizeSave({
   version: SAVE_SCHEMA - 1,
@@ -249,6 +308,18 @@ const currentSave = normalizeSave({
 assert(currentSave.unlocked === 17, 'Current-schema saves must retain progression');
 assert(currentSave.selectedWeapon === 'blaster2', 'Current-schema saves must retain valid equipped weapons');
 assert(currentSave.selectedModules.includes('collector'), 'Current-schema saves must retain valid modules');
+assert(currentSave.stats && currentSave.challenges && currentSave.achievements, 'Current-schema saves must always normalize progression expansion fields');
+assert(currentSave.settings.effects === 'full', 'Current-schema saves without a custom effect setting must use Full effects');
+
+const achievementSave = normalizeSave({
+  ...structuredClone(DEFAULT_SAVE),
+  unlocked: 92,
+  completed: { 1: 3 },
+});
+const newlyUnlocked = evaluateAchievements(achievementSave, 123456);
+assert(newlyUnlocked.some((item) => item.id === 'hydrogen'), 'Completing Hydrogen must unlock the first achievement');
+assert(newlyUnlocked.some((item) => item.id === 'uranium'), 'Reaching Uranium must unlock its progression achievement');
+assert(getAchievementProgress(achievementSave, ACHIEVEMENTS.find((item) => item.id === 'uranium')).current === 92, 'Achievement progress must expose Uranium progression');
 const clampedVolumeSave = normalizeSave({
   ...structuredClone(DEFAULT_SAVE),
   settings: { ...DEFAULT_SAVE.settings, sfxVolume: 2, musicVolume: -0.5 },
@@ -354,6 +425,8 @@ audio.setMusicMode('marathon');
 assert(audio.musicMode === 'marathon', 'Audio system must switch to the Marathon remix');
 audio.setMusicMode('menu');
 assert(audio.musicMode === 'menu', 'Audio system must switch back to the menu OST');
+audio.setGameplayState({ phase:'post', electronFraction:0, lives:1, mode:'classic' });
+assert(audio.gameplayState.phase === 'post' && audio.gameplayState.lives === 1, 'Audio system must retain reactive gameplay state');
 assert(await audio.unlock(), 'Audio system should unlock after a user-gesture resume');
 assert(Math.abs(audio.sfxBus.gain.value - 0.36) < 1e-9, 'SFX volume must scale the SFX bus live');
 assert(Math.abs(audio.musicBus.gain.value - 0.095) < 1e-9, 'Music volume must scale the music bus live');
@@ -369,4 +442,4 @@ audio.extraLife();
 audio.stopMusic();
 assert(!audio.musicRunning, 'Music scheduler should stop cleanly');
 
-console.log('Atom Shooter 1.2.0 parity smoke checks passed.');
+console.log('Atom Shooter 1.3.0 parity smoke checks passed.');
