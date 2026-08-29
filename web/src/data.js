@@ -35,7 +35,8 @@ export const SHIPS = [
  {id:'falcon',name:'Falcon',costE:110,costN:10,mass:1.0,size:1,thrust:1.08,slots:2,pickup:1.12,gravity:.9,visual:{pattern:'chevron'},desc:'A considerably large vessel. Its mass adds inertia, while two upgrade slots and a larger pickup footprint make it highly configurable.'},
  {id:'behemoth',name:'Behemoth',costE:220,costN:24,mass:1.35,size:1.22,thrust:.92,slots:4,pickup:1.35,gravity:.88,visual:{pattern:'armor'},desc:'The largest available ship — a real nano fortress. Heavy handling is compensated by four upgrade slots and excellent particle collection.'},
  {id:'hawk',name:'Hawk',costE:420,costN:48,mass:1.18,size:1.08,thrust:1.18,slots:3,pickup:1.23,gravity:.8,visual:{pattern:'panel'},desc:'A reasonable compromise between size, handling and features. Smaller and easier to handle than Behemoth without losing too much flexibility.'},
- {id:'nano2',name:'Nano II',costE:700,costN:90,mass:.76,size:.82,thrust:1.28,slots:0,pickup:1.6,gravity:.72,builtinPickup:true,visual:{pattern:'grid'},desc:'Second generation Nano. It has no module slots, but comes with a built-in electron pick-up field.'}
+ {id:'nano2',name:'Nano II',costE:700,costN:90,mass:.76,size:.82,thrust:1.28,slots:0,pickup:1.6,gravity:.72,builtinPickup:true,visual:{pattern:'grid'},desc:'Second generation Nano. It has no module slots, but comes with a built-in electron pick-up field.'},
+ {id:'quark',name:'Quark',costE:0,costN:0,mass:.82,size:.9,thrust:1.24,slots:3,pickup:1.42,gravity:.68,rewardOnly:true,reward:'Complete all 118 elements',visual:{pattern:'prism'},desc:'Periodic-table mastery vessel. Compact, agile and exceptionally resistant to nucleus pull.'}
 ];
 
 const ENERGY = {
@@ -57,7 +58,12 @@ export const WEAPONS = [
  weapon({id:'gatlings',family:'gatling',tier:3,asset:'gatlings',requires:'gatlingp',name:'Gatling Gun S',costE:470,costN:54,rate:20,speed:830,life:.95,bullets:1,spread:.025,size:4,damage:.5,bulletLimit:96,desc:'It takes 2 hits to destroy an electron — but with increased accuracy and 20 rounds per second it is hardly an issue.'}),
  weapon({id:'burster',family:'burster',tier:1,asset:'burster',name:'Burster',costE:330,costN:38,rate:1.85,speed:620,life:.95,bullets:5,spread:.18,size:5.2,damage:1,continuous:false,desc:'This weapon bursts 5 particles with little precision. Good for short range.'}),
  weapon({id:'bursterf',family:'burster',tier:2,asset:'bursterf',requires:'burster',name:'Burster F',costE:460,costN:55,rate:2.25,speed:675,life:1.0,bullets:7,spread:.14,size:5.1,damage:1,continuous:false,desc:'Fires 7 particles with more precision and slightly higher velocity. Faster reload times.'}),
- weapon({id:'bursterr',family:'burster',tier:3,asset:'bursterr',requires:'bursterf',name:'Burster R',costE:620,costN:78,rate:2.8,speed:710,life:1.04,bullets:10,spread:.115,size:5,damage:1,continuous:false,bulletLimit:80,desc:'Fires 10 particles. Good reload time and precision make it a great weapon.'})
+ weapon({id:'bursterr',family:'burster',tier:3,asset:'bursterr',requires:'bursterf',name:'Burster R',costE:620,costN:78,rate:2.8,speed:710,life:1.04,bullets:10,spread:.115,size:5,damage:1,continuous:false,bulletLimit:80,desc:'Fires 10 particles. Good reload time and precision make it a great weapon.'}),
+ weapon({id:'laser',family:'laser',tier:1,tierTotal:1,asset:'laser',name:'Laser',kind:'laser',costE:540,costN:64,rate:12,speed:0,life:.07,bullets:0,spread:0,size:3.5,damage:.34,range:430,capacity:76,regen:23,cost:2.7,bulletLimit:0,desc:'Continuous precision beam. Excellent tracking and reach, but sustained fire drains energy quickly.'}),
+ weapon({id:'arcgun',family:'arc',tier:1,tierTotal:1,asset:'arcgun',name:'Arc Gun',kind:'arc',costE:610,costN:74,rate:2.7,speed:0,life:.12,bullets:0,spread:0,size:4,damage:1.05,range:310,chains:3,chainRange:150,capacity:66,regen:20,cost:13,bulletLimit:0,continuous:false,desc:'Locks onto an electron near the reticle and chains its discharge into nearby orbitals.'}),
+ weapon({id:'homing',family:'homing',tier:1,tierTotal:1,asset:'homing',name:'Homing Particle Launcher',kind:'homing',costE:690,costN:86,rate:2.15,speed:430,life:1.65,bullets:1,spread:0,size:6.2,damage:1.2,homing:5.4,capacity:70,regen:21,cost:11,bulletLimit:24,desc:'Launches slower guided particles that steer toward the nearest intact electron.'}),
+ weapon({id:'rail',family:'rail',tier:1,tierTotal:1,asset:'rail',name:'Rail Cannon',kind:'rail',costE:0,costN:0,rate:.78,speed:1120,life:.92,bullets:1,spread:0,size:4.6,damage:2.5,pierce:8,capacity:56,regen:15,cost:24,bulletLimit:12,continuous:false,rewardOnly:true,reward:'Complete all transition metals',desc:'Periodic-table reward. A slow-firing hypervelocity penetrator that can punch through a line of electrons.'}),
+ weapon({id:'pulsewave',family:'pulse',tier:1,tierTotal:1,asset:'pulsewave',name:'Pulse Wave',kind:'pulse',costE:760,costN:96,rate:1.35,speed:0,life:.18,bullets:0,spread:0,size:7,damage:1.2,range:138,capacity:68,regen:21,cost:20,bulletLimit:0,continuous:false,desc:'Short-range radial blast around the ship. Powerful when flying close to electron shells, useless at long range.'})
 ];
 
 export const ENGINES = [
@@ -78,7 +84,7 @@ const MODULE_FAMILIES = [
   {family:'timewarp',asset:'timewarp',names:['TimeWarp','TimeWarp Mk2','TimeWarp Mk3'],effects:[.9,.85,.8],effect:'time',costs:[[170,16],[320,34],[560,70]],descs:['Slows down time by 10%. A subtle change.','Slows down time by 15%.','Slows down time by 20%. May not feel like much, but it can make a difference.']},
 ];
 
-export const MODULES = MODULE_FAMILIES.flatMap((family) => family.names.map((name,index) => {
+const BASE_MODULES = MODULE_FAMILIES.flatMap((family) => family.names.map((name,index) => {
   const tier = index + 1;
   const id = tier === 1 ? family.family : `${family.family}${tier}`;
   return {
@@ -95,6 +101,22 @@ export const MODULES = MODULE_FAMILIES.flatMap((family) => family.names.map((nam
     desc:family.descs[index],
   };
 }));
+
+export const MODULES = [
+  ...BASE_MODULES,
+  {id:'alkali-stabilizer',family:'reward-alkali',tier:1,tierTotal:1,asset:'alkali-stabilizer',name:'Alkali Stabilizer',costE:0,costN:0,effect:'gravity',value:.78,requires:null,rewardOnly:true,reward:'Complete all alkali metals',desc:'Group-completion reward that reduces nucleus pull without being part of a normal three-tier module family.'},
+];
+
+export const PAINTS = [
+  {id:'standard',name:'Standard',body:'#f9fcfd',accent:'#ef355d',outline:'#2e9ea7',tint:null,tintAlpha:0,desc:'Original factory paint.',unlock:'Always available'},
+  {id:'medal-crimson',name:'Medal Crimson',body:'#fff5f7',accent:'#ef355d',outline:'#b61f43',tint:'#ef355d',tintAlpha:.18,glow:'#ef355d',desc:'Crimson challenge livery.',unlock:'Earn 30 challenge medals'},
+  {id:'achievement-gold',name:'Achievement Gold',body:'#fff9de',accent:'#f3b637',outline:'#ad7418',tint:'#f3b637',tintAlpha:.22,glow:'#f3b637',desc:'Gold finish for dedicated achievement hunters.',unlock:'Unlock 5 achievements'},
+  {id:'alkali-ember',name:'Alkali Ember',body:'#fff0dc',accent:'#ef6b35',outline:'#a84318',tint:'#ef6b35',tintAlpha:.2,glow:'#ef6b35',desc:'Hot orange element-group paint.',unlock:'Complete all alkali metals'},
+  {id:'noble-aurora',name:'Noble Aurora',body:'#eefcff',accent:'#73d9e6',outline:'#6557ba',tint:'#6ccfe0',tintAlpha:.2,glow:'#8f6bd8',desc:'Cool aurora finish earned from every noble gas.',unlock:'Complete all noble gases'},
+  {id:'radioactive-glow',name:'Radioactive Glow',body:'#f4ffe8',accent:'#8fd448',outline:'#477b1f',tint:'#8fd448',tintAlpha:.2,glow:'#9ce851',desc:'A luminous green finish for clearing every radioactive element.',unlock:'Complete all radioactive elements'},
+  {id:'marathon-void',name:'Marathon Void',body:'#e9e5ff',accent:'#7657c8',outline:'#382d70',tint:'#4e3a91',tintAlpha:.3,glow:'#8f6bd8',desc:'Deep-violet endurance paint.',unlock:'Survive 30 minutes in Marathon'},
+  {id:'periodic-prism',name:'Periodic Prism',body:'#ffffff',accent:'#2aa8d8',outline:'#7a4ec2',tint:'#2aa8d8',tintAlpha:.14,glow:'#ffffff',dynamic:'prism',desc:'Full-table mastery paint that shifts hue with the current element.',unlock:'Complete all 118 elements'},
+];
 
 export const POWERUPS = [
   {id:'ammo',name:'Ammo',symbol:'A',color:'#f2b23b',duration:0,desc:'Instantly restores weapon energy.'},

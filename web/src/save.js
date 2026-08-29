@@ -1,4 +1,4 @@
-import { SHIPS, WEAPONS, ENGINES, MODULES, findById } from './data.js';
+import { SHIPS, WEAPONS, ENGINES, MODULES, PAINTS, findById } from './data.js';
 
 export const SAVE_SCHEMA = 3;
 
@@ -9,6 +9,9 @@ export const DEFAULT_SAVE = {
   records: {},
   challenges: {},
   achievements: {},
+  rewards: {},
+  unlockedPaints: ['standard'],
+  selectedPaint: 'standard',
   stats: {
     totalElectronsCollected: 0,
     totalNeutronsCollected: 0,
@@ -100,6 +103,12 @@ export function normalizeSave(stored) {
   ensureOwned(purchased, 'weapons', selectedWeapon);
   ensureOwned(purchased, 'engines', selectedEngine);
 
+  const validPaints = new Set(PAINTS.map((paint) => paint.id));
+  const unlockedPaints = unique(['standard', ...(Array.isArray(stored.unlockedPaints) ? stored.unlockedPaints : [])].filter((id) => validPaints.has(id)));
+  const selectedPaint = validPaints.has(stored.selectedPaint) && unlockedPaints.includes(stored.selectedPaint)
+    ? stored.selectedPaint
+    : 'standard';
+
   const settings = { ...DEFAULT_SAVE.settings, ...plainObject(stored.settings) };
   delete settings.sfx;
   delete settings.music;
@@ -141,6 +150,9 @@ export function normalizeSave(stored) {
     records: plainObject(stored.records),
     challenges: plainObject(stored.challenges),
     achievements: plainObject(stored.achievements),
+    rewards: plainObject(stored.rewards),
+    unlockedPaints,
+    selectedPaint,
     stats,
     electrons: Math.max(0, Math.floor(Number(stored.electrons) || 0)),
     neutrons: Math.max(0, Math.floor(Number(stored.neutrons) || 0)),

@@ -5,11 +5,12 @@ import {
   WEAPONS,
   ENGINES,
   MODULES,
+  PAINTS,
   POWERUPS,
   getElectronShellCounts,
   getMarathonThresholds,
 } from '../web/src/data.js';
-import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon, CORE_EXCLUSION_RADIUS, isShipInsideCore } from '../web/src/game.js';
+import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon, CORE_EXCLUSION_RADIUS, isShipInsideCore, getNucleusDamageStage } from '../web/src/game.js';
 import { AudioSystem, MUSIC_TRACKS } from '../web/src/audio.js';
 import { DEFAULT_SAVE, SAVE_SCHEMA, loadSave, normalizeSave, normalizeMarathonState } from '../web/src/save.js';
 import {
@@ -22,6 +23,9 @@ import {
   ACHIEVEMENTS,
   getAchievementProgress,
   evaluateAchievements,
+  COMPLETION_GROUPS,
+  isCompletionGroupDone,
+  evaluateProgressionRewards,
 } from '../web/src/progression.js';
 
 function assert(condition, message) {
@@ -29,15 +33,17 @@ function assert(condition, message) {
 }
 
 assert(ELEMENTS.length === 118, `Expected 118 elements, got ${ELEMENTS.length}`);
-assert(SHIPS.length === 6, `Expected 6 ships, got ${SHIPS.length}`);
-assert(WEAPONS.length === 10, `Expected starter Blaster plus 9 weapon upgrades, got ${WEAPONS.length}`);
+assert(SHIPS.length === 7, `Expected six standard ships plus the Quark reward ship, got ${SHIPS.length}`);
+assert(WEAPONS.length === 15, `Expected 10 existing weapons plus five 1.4 sidegrades, got ${WEAPONS.length}`);
 assert(ENGINES.length === 5, `Expected 5 engines, got ${ENGINES.length}`);
-assert(MODULES.length === 21, `Expected 21 module upgrades, got ${MODULES.length}`);
+assert(MODULES.length === 22, `Expected 21 standard modules plus the alkali reward module, got ${MODULES.length}`);
+assert(PAINTS.length >= 8, '1.4 must expose the cosmetic paint catalogue');
 assert(POWERUPS.length === 6, `Expected 6 temporary power-ups, got ${POWERUPS.length}`);
 assert(ACHIEVEMENTS.length >= 9, 'Achievement catalogue must cover progression, Marathon, collection and ownership milestones');
 assert(MARATHON_MODIFIERS.length === 8, 'Marathon must expose all eight procedural modifiers');
 assert(DEFAULT_SAVE.settings.effects === 'full', 'Screen effects must default to Full');
 assert(DEFAULT_SAVE.challenges && DEFAULT_SAVE.achievements && DEFAULT_SAVE.stats, 'Current save schema must include challenges, achievements and lifetime stats');
+assert(DEFAULT_SAVE.selectedPaint === 'standard' && DEFAULT_SAVE.unlockedPaints.includes('standard'), 'New saves must start with Standard paint unlocked and equipped');
 
 for (const element of ELEMENTS) {
   const metadata = getElementMetadata(element);
@@ -93,9 +99,15 @@ assert(gatling[2].damage === 0.5, 'Gatling Gun S must require two hits per elect
 const burster = WEAPONS.filter((weapon) => weapon.family === 'burster');
 assert(burster.map((weapon) => weapon.bullets).join(',') === '5,7,10', 'Burster family must fire 5/7/10 particles');
 assert(WEAPONS.every((weapon) => weapon.capacity > 0 && weapon.regen > 0 && weapon.cost > 0), 'Every weapon must have energy capacity, regeneration and shot cost');
+for (const id of ['laser','arcgun','homing','rail','pulsewave']) assert(WEAPONS.some((weapon) => weapon.id === id), `Missing 1.4 weapon ${id}`);
+assert(WEAPONS.find((weapon) => weapon.id === 'laser')?.kind === 'laser' && WEAPONS.find((weapon) => weapon.id === 'laser')?.bullets === 0, 'Laser must use direct continuous beam mechanics');
+assert(WEAPONS.find((weapon) => weapon.id === 'arcgun')?.chains === 3, 'Arc Gun must chain between multiple electrons');
+assert(WEAPONS.find((weapon) => weapon.id === 'homing')?.homing > 0, 'Homing launcher projectiles must steer');
+assert(WEAPONS.find((weapon) => weapon.id === 'rail')?.rewardOnly && WEAPONS.find((weapon) => weapon.id === 'rail')?.pierce >= 8, 'Rail Cannon must be a transition-metal reward and high-pierce sidegrade');
+assert(WEAPONS.find((weapon) => weapon.id === 'pulsewave')?.range > 100, 'Pulse Wave must use a short-range radial radius');
 
 const moduleFamilies = new Map();
-for (const module of MODULES) {
+for (const module of MODULES.filter((item) => !item.rewardOnly)) {
   if (!moduleFamilies.has(module.family)) moduleFamilies.set(module.family, []);
   moduleFamilies.get(module.family).push(module);
 }
@@ -120,6 +132,11 @@ assert(CORE_EXCLUSION_RADIUS === 86, 'The core death boundary must match the inn
 assert(isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS, r: 13 }), 'A ship hull crossing the inner orbit must be inside the lethal core zone');
 assert(!isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS + 13, r: 13 }), 'A ship whose hull only touches the inner orbit must remain safe');
 assert(!isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS + 40, r: 13 }), 'A ship outside the inner orbit must remain safe');
+assert(getNucleusDamageStage({orbiting:100,total:100,phase:'electrons'}) === 'intact', 'Fresh nucleus must render intact');
+assert(getNucleusDamageStage({orbiting:70,total:100,phase:'electrons'}) === 'cracked', 'Electron removal must visually crack the nucleus');
+assert(getNucleusDamageStage({orbiting:30,total:100,phase:'electrons'}) === 'heavily-cracked', 'Deep electron removal must produce heavy cracks');
+assert(getNucleusDamageStage({orbiting:10,total:100,phase:'electrons'}) === 'unstable', 'Near-clear nucleus must visibly pulse as unstable');
+assert(getNucleusDamageStage({orbiting:0,total:100,phase:'post'}) === 'exploded', 'Post-split nucleus visual stage must be exploded');
 
 for (const family of ['blaster', 'gatling', 'burster']) {
   const items = WEAPONS.filter((item) => item.family === family);
@@ -240,7 +257,7 @@ for (const loopFile of ['web/assets/audio/level-loop.wav', 'web/assets/audio/mar
 }
 
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-assert(packageJson.version === '1.3.0', `Expected package version 1.3.0, got ${packageJson.version}`);
+assert(packageJson.version === '1.4.0', `Expected package version 1.4.0, got ${packageJson.version}`);
 assert(packageJson.build?.portable?.artifactName === 'Atom-Shooter.exe', 'Windows artifact must remain Atom-Shooter.exe');
 JSON.parse(fs.readFileSync('web/manifest.webmanifest', 'utf8'));
 
@@ -251,6 +268,7 @@ for (const id of ['screen-splash', 'setting-control', 'setting-effects', 'weapon
 
 const appSource = fs.readFileSync('web/src/app.js', 'utf8');
 assert(html.includes('id="shop-tutorial"'), 'Shop tutorial overlay must exist');
+assert(html.includes('data-tab="paints"'), 'Shop must expose the Paint tab');
 assert(appSource.includes('marathonHistory'), 'App must expose Marathon history');
 assert(appSource.includes('marathonResume'), 'App must persist Marathon resume state');
 assert(!appSource.includes('Control mode: ${controlModeLabel(save.settings.controlMode)}'), 'Pause menu must not show a separate control-mode text line');
@@ -270,6 +288,10 @@ assert(gameSource.includes('updateHazards(dt)'), 'Game must simulate radioactive
 assert(gameSource.includes('challengeStates(true)'), 'Game completion must evaluate optional challenge outcomes');
 assert(gameSource.includes('marathonModifier'), 'Game must apply Marathon modifiers');
 assert(gameSource.includes('muzzleFlash()') && gameSource.includes('shieldHit('), 'Renderer must include expanded weapon/shield feedback');
+assert(gameSource.includes('fireLaser(') && gameSource.includes('fireArc(') && gameSource.includes('firePulse('), 'Game must implement direct mechanics for new 1.4 weapons');
+assert(gameSource.includes('slowMoTimer = .42'), 'Final electron clear must trigger the short slow-motion destruction beat');
+assert(gameSource.includes('Persistent red hazard glow'), 'Unsplit lethal core must render its red warning glow');
+assert(!gameSource.includes("this.phase === 'strip'") && !gameSource.includes('this.t *'), 'Core warning glow must use live phase/time state instead of stale identifiers');
 const audioSource = fs.readFileSync('web/src/audio.js', 'utf8');
 assert(audioSource.includes('setGameplayState(state'), 'Audio system must accept reactive gameplay state');
 assert(audioSource.includes('tickReactiveLayer()'), 'Audio system must layer reactive gameplay music');
@@ -315,6 +337,7 @@ assert(currentSave.unlocked === 17, 'Current-schema saves must retain progressio
 assert(currentSave.selectedWeapon === 'blaster2', 'Current-schema saves must retain valid equipped weapons');
 assert(currentSave.selectedModules.includes('collector'), 'Current-schema saves must retain valid modules');
 assert(currentSave.stats && currentSave.challenges && currentSave.achievements, 'Current-schema saves must always normalize progression expansion fields');
+assert(currentSave.unlockedPaints.includes('standard') && currentSave.selectedPaint === 'standard', 'Current saves must normalize cosmetic paint fields');
 assert(currentSave.settings.effects === 'full', 'Current-schema saves without a custom effect setting must use Full effects');
 
 const achievementSave = normalizeSave({
@@ -326,6 +349,16 @@ const newlyUnlocked = evaluateAchievements(achievementSave, 123456);
 assert(newlyUnlocked.some((item) => item.id === 'hydrogen'), 'Completing Hydrogen must unlock the first achievement');
 assert(newlyUnlocked.some((item) => item.id === 'uranium'), 'Reaching Uranium must unlock its progression achievement');
 assert(getAchievementProgress(achievementSave, ACHIEVEMENTS.find((item) => item.id === 'uranium')).current === 92, 'Achievement progress must expose Uranium progression');
+const rewardSave = structuredClone(DEFAULT_SAVE);
+for (const z of COMPLETION_GROUPS.alkali) rewardSave.completed[z] = 3;
+assert(isCompletionGroupDone(rewardSave, 'alkali'), 'Alkali completion group must detect all required elements');
+const alkaliRewards = evaluateProgressionRewards(rewardSave, 111);
+assert(alkaliRewards.some((reward) => reward.itemId === 'alkali-stabilizer'), 'All alkali metals must unlock the reward module');
+assert(rewardSave.purchased.modules.includes('alkali-stabilizer') && rewardSave.unlockedPaints.includes('alkali-ember'), 'Alkali rewards must be inserted into module/paint ownership');
+const transitionSave = structuredClone(DEFAULT_SAVE);
+for (const z of COMPLETION_GROUPS.transition) transitionSave.completed[z] = 3;
+evaluateProgressionRewards(transitionSave, 222);
+assert(transitionSave.purchased.weapons.includes('rail'), 'All transition metals must unlock Rail Cannon');
 const clampedVolumeSave = normalizeSave({
   ...structuredClone(DEFAULT_SAVE),
   settings: { ...DEFAULT_SAVE.settings, sfxVolume: 2, musicVolume: -0.5 },
@@ -448,4 +481,4 @@ audio.extraLife();
 audio.stopMusic();
 assert(!audio.musicRunning, 'Music scheduler should stop cleanly');
 
-console.log('Atom Shooter 1.3.0 parity smoke checks passed.');
+console.log('Atom Shooter 1.4.0 gameplay smoke checks passed.');

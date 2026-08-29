@@ -500,3 +500,51 @@ select { border: 1px solid var(--line); background: #fff; border-radius: 10px; p
 .challenge-line strong { font-size: 9px; }
 .challenge-line em { font-style: normal; color: #809198; font-size: 7px; line-height: 1.25; }
 @media (max-width:700px) { .challenge-line em { display: none; } }
+
+/* 1.4 cosmetic paint/reward cards */
+.item-card.reward-locked { opacity: .76; }
+.reward-price { color: var(--accent); font-weight: 800; }
+.paint-preview {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--paint-glow) 35%, transparent), transparent 48%), #f1f5f6;
+}
+.paint-preview .paint-ship {
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  color: var(--paint-body);
+  font-size: 68px;
+  line-height: 1;
+  -webkit-text-stroke: 3px var(--paint-outline);
+  text-shadow: 0 0 16px var(--paint-glow);
+  transform: rotate(0deg);
+}
+.paint-preview i {
+  position: absolute;
+  width: 22px;
+  height: 34px;
+  top: calc(50% - 8px);
+  left: calc(50% - 11px);
+  background: var(--paint-accent);
+  clip-path: polygon(50% 0, 100% 100%, 50% 78%, 0 100%);
+}
+.completion-rewards {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255,255,255,.72);
+}
+.completion-rewards h3 { margin: 0 0 4px; }
+.completion-rewards div { display: grid; grid-template-columns: minmax(150px,1fr) auto minmax(180px,1.4fr); gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.completion-rewards div:first-of-type { border-top: 0; }
+.completion-rewards span { font-weight: 800; }
+.completion-rewards small { color: var(--muted); }
+@media (max-width: 640px) {
+  .completion-rewards div { grid-template-columns: 1fr auto; }
+  .completion-rewards small { grid-column: 1 / -1; }
+}

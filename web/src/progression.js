@@ -10,6 +10,30 @@ const HALOGEN = set(9, 17, 35, 53, 85, 117);
 const METALLOID = set(5, 14, 32, 33, 51, 52);
 const OTHER_NONMETAL = set(1, 6, 7, 8, 15, 16, 34);
 const RADIOACTIVE = new Set([43, 61, ...Array.from({ length: 35 }, (_, i) => 84 + i)]);
+export const COMPLETION_GROUPS = Object.freeze({
+  alkali: Object.freeze([3,11,19,37,55,87]),
+  noble: Object.freeze([2,10,18,36,54,86,118]),
+  transition: Object.freeze([
+    ...Array.from({length:10},(_,i)=>21+i),
+    ...Array.from({length:10},(_,i)=>39+i),
+    ...Array.from({length:9},(_,i)=>72+i),
+    ...Array.from({length:9},(_,i)=>104+i),
+  ]),
+  radioactive: Object.freeze([43,61,...Array.from({length:35},(_,i)=>84+i)]),
+  full: Object.freeze(Array.from({length:118},(_,i)=>i+1)),
+});
+
+export function isCompletionGroupDone(save, group) {
+  const ids = COMPLETION_GROUPS[group] || [];
+  return ids.length > 0 && ids.every((z) => Boolean(save?.completed?.[z]));
+}
+
+export function countChallengeMedals(save) {
+  return Object.values(save?.challenges || {}).reduce((sum, entry) => (
+    sum + (Array.isArray(entry?.completed) ? entry.completed.length : 0)
+  ), 0);
+}
+
 
 const ATOMIC_MASSES = [
   1.008,4.0026,6.94,9.0122,10.81,12.011,14.007,15.999,18.998,20.180,
@@ -244,7 +268,8 @@ export const ACHIEVEMENTS = Object.freeze([
   { id:'marathon-60', title:'Infinite Focus', description:'Survive 60 minutes in Marathon.', target:3600 },
   { id:'neutron-1000', title:'Neutron Hoard', description:'Collect 1,000 neutrons across all runs.', target:1000 },
   { id:'precision', title:'Trigger Discipline', description:'Complete a level using no more than 12 shots.', target:1 },
-  { id:'arsenal', title:'Fully Equipped', description:'Own every ship, weapon, engine and module.', target:1 },
+  { id:'arsenal', title:'Fully Equipped', description:'Own every purchasable ship, weapon, engine and module.', target:1 },
+  { id:'radioactive-master', title:'Hot Zone', description:'Complete every radioactive element.', target:1 },
 ]);
 
 function completedCount(save) {
@@ -253,10 +278,8 @@ function completedCount(save) {
 
 function ownsEverything(save) {
   const purchased = save.purchased || {};
-  return (purchased.ships?.length || 0) >= SHIPS.length
-    && (purchased.weapons?.length || 0) >= WEAPONS.length
-    && (purchased.engines?.length || 0) >= ENGINES.length
-    && (purchased.modules?.length || 0) >= MODULES.length;
+  const owned = (tab, items) => items.filter((item) => !item.rewardOnly).every((item) => purchased[tab]?.includes(item.id));
+  return owned('ships', SHIPS) && owned('weapons', WEAPONS) && owned('engines', ENGINES) && owned('modules', MODULES);
 }
 
 export function getAchievementProgress(save, achievement) {
@@ -272,6 +295,7 @@ export function getAchievementProgress(save, achievement) {
     case 'neutron-1000': current = Number(stats.totalNeutronsCollected || 0); break;
     case 'precision': current = stats.lowShotClear ? 1 : 0; break;
     case 'arsenal': current = ownsEverything(save) ? 1 : 0; break;
+    case 'radioactive-master': current = isCompletionGroupDone(save, 'radioactive') ? 1 : 0; break;
     default: current = 0;
   }
   return { current:Math.min(current, achievement.target), target:achievement.target };
@@ -289,4 +313,48 @@ export function evaluateAchievements(save, now = Date.now()) {
     }
   }
   return unlocked;
+}
+
+
+const REWARD_DEFINITIONS = Object.freeze([
+  {id:'alkali-module', when:(save)=>isCompletionGroupDone(save,'alkali'), type:'module', itemId:'alkali-stabilizer', title:'Alkali Stabilizer', description:'Completed all alkali metals.'},
+  {id:'alkali-paint', when:(save)=>isCompletionGroupDone(save,'alkali'), type:'paint', itemId:'alkali-ember', title:'Alkali Ember paint', description:'Completed all alkali metals.'},
+  {id:'noble-paint', when:(save)=>isCompletionGroupDone(save,'noble'), type:'paint', itemId:'noble-aurora', title:'Noble Aurora paint', description:'Completed all noble gases.'},
+  {id:'transition-weapon', when:(save)=>isCompletionGroupDone(save,'transition'), type:'weapon', itemId:'rail', title:'Rail Cannon', description:'Completed all transition metals.'},
+  {id:'radioactive-paint', when:(save)=>isCompletionGroupDone(save,'radioactive'), type:'paint', itemId:'radioactive-glow', title:'Radioactive Glow paint', description:'Completed all radioactive elements.'},
+  {id:'challenge-paint', when:(save)=>countChallengeMedals(save)>=30, type:'paint', itemId:'medal-crimson', title:'Medal Crimson paint', description:'Earned 30 challenge medals.'},
+  {id:'achievement-paint', when:(save)=>Object.keys(save?.achievements||{}).length>=5, type:'paint', itemId:'achievement-gold', title:'Achievement Gold paint', description:'Unlocked 5 achievements.'},
+  {id:'marathon-paint', when:(save)=>Number(save?.stats?.marathonBestTime||0)>=1800, type:'paint', itemId:'marathon-void', title:'Marathon Void paint', description:'Survived 30 minutes in Marathon.'},
+  {id:'full-ship', when:(save)=>isCompletionGroupDone(save,'full'), type:'ship', itemId:'quark', title:'Quark ship', description:'Completed all 118 elements.'},
+  {id:'full-paint', when:(save)=>isCompletionGroupDone(save,'full'), type:'paint', itemId:'periodic-prism', title:'Periodic Prism paint', description:'Completed all 118 elements.'},
+]);
+
+export function evaluateProgressionRewards(save, now = Date.now()) {
+  if (!save.rewards || typeof save.rewards !== 'object') save.rewards = {};
+  if (!Array.isArray(save.unlockedPaints)) save.unlockedPaints = ['standard'];
+  if (!save.unlockedPaints.includes('standard')) save.unlockedPaints.unshift('standard');
+  const unlocked = [];
+  for (const reward of REWARD_DEFINITIONS) {
+    if (save.rewards[reward.id] || !reward.when(save)) continue;
+    save.rewards[reward.id] = now;
+    if (reward.type === 'paint') {
+      if (!save.unlockedPaints.includes(reward.itemId)) save.unlockedPaints.push(reward.itemId);
+    } else {
+      const tab = reward.type === 'ship' ? 'ships' : reward.type === 'weapon' ? 'weapons' : 'modules';
+      if (!Array.isArray(save.purchased?.[tab])) save.purchased[tab] = [];
+      if (!save.purchased[tab].includes(reward.itemId)) save.purchased[tab].push(reward.itemId);
+    }
+    unlocked.push(reward);
+  }
+  return unlocked;
+}
+
+export function getProgressionRewardStatus(save) {
+  return {
+    alkali: {current:COMPLETION_GROUPS.alkali.filter((z)=>save?.completed?.[z]).length, target:COMPLETION_GROUPS.alkali.length},
+    noble: {current:COMPLETION_GROUPS.noble.filter((z)=>save?.completed?.[z]).length, target:COMPLETION_GROUPS.noble.length},
+    transition: {current:COMPLETION_GROUPS.transition.filter((z)=>save?.completed?.[z]).length, target:COMPLETION_GROUPS.transition.length},
+    radioactive: {current:COMPLETION_GROUPS.radioactive.filter((z)=>save?.completed?.[z]).length, target:COMPLETION_GROUPS.radioactive.length},
+    full: {current:Object.values(save?.completed||{}).filter(Boolean).length, target:118},
+  };
 }

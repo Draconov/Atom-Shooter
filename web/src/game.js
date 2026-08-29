@@ -4,6 +4,7 @@ import {
   WEAPONS,
   ENGINES,
   MODULES,
+  PAINTS,
   POWERUPS,
   getElectronShellCounts,
   getMarathonThresholds,
@@ -61,6 +62,17 @@ export const CORE_EXCLUSION_RADIUS = 86;
 export function isShipInsideCore({ x, y, r = 0 }, coreRadius = CORE_EXCLUSION_RADIUS) {
   const distance = Math.hypot(Number(x) - 500, Number(y) - 500);
   return distance < Math.max(0, Number(coreRadius) || CORE_EXCLUSION_RADIUS) + Math.max(0, Number(r) || 0);
+}
+
+export function getNucleusDamageStage({ orbiting = 0, total = 0, phase = 'electrons' } = {}) {
+  if (phase === 'post') return 'exploded';
+  if (phase === 'unstable') return 'unstable';
+  const safeTotal = Math.max(1, Number(total) || 1);
+  const removed = clamp(1 - Math.max(0, Number(orbiting) || 0) / safeTotal, 0, 1);
+  if (removed < .25) return 'intact';
+  if (removed < .55) return 'cracked';
+  if (removed < .82) return 'heavily-cracked';
+  return 'unstable';
 }
 
 export class AtomGame {
@@ -259,6 +271,7 @@ export class AtomGame {
     this.neutronGoal = Math.max(1, Math.ceil(this.element.z / 12));
     this.neutronTotal = 0;
     this.bullets = [];
+    this.beams = [];
     this.nuclear = [];
     this.hazards = [];
     this.powerups = [];
@@ -268,6 +281,7 @@ export class AtomGame {
     this.protonEmissionClock = protonInterval ? rnd(protonInterval * .65, protonInterval * 1.15) : 0;
     this.particles = [];
     this.shake = 0;
+    this.slowMoTimer = 0;
     this.screenFlash = { alpha: 0, color: '#ffffff' };
     this.messageTimer = 0;
     this.challengeMetrics = {
@@ -525,9 +539,11 @@ export class AtomGame {
   fire() {
     const ship = this.ship;
     const weapon = this.loadout.weapon;
+    const directWeapon = ['laser', 'arc', 'pulse'].includes(weapon.kind);
+    const volleySize = directWeapon ? 0 : weapon.bullets;
     if (!canFireWeapon({
       activeBullets: this.bullets.length,
-      volleySize: weapon.bullets,
+      volleySize,
       bulletLimit: weapon.bulletLimit,
       energy: ship.energy,
       cost: weapon.cost,
@@ -544,64 +560,175 @@ export class AtomGame {
     ship.cooldown = 1 / (weapon.rate * (this.marathonModifier?.fireRate || 1));
     this.challengeMetrics.shotsFired += 1;
     if (this.save.stats) this.save.stats.totalShots += 1;
-    const center = (weapon.bullets - 1) / 2;
-    const speed = weapon.speed * this.loadout.stat.bulletSpeed;
     const bigFire = this.hasPower('bigfire');
-    const bulletSize = weapon.size * this.loadout.stat.bulletSize * (bigFire ? 1.7 : 1);
-    const damage = weapon.damage + (bigFire ? 0.5 : 0);
+    const damageScale = bigFire ? 1.5 : 1;
 
-    for (let i = 0; i < weapon.bullets; i += 1) {
-      const angle = this.ship.angle + (i - center) * weapon.spread;
-      this.bullets.push({
-        x: ship.x + Math.cos(angle) * ship.r * 1.4,
-        y: ship.y + Math.sin(angle) * ship.r * 1.4,
-        px: ship.x,
-        py: ship.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        ttl: weapon.life,
-        r: bulletSize,
-        damage,
-        pierce: weapon.pierce || 1,
-      });
+    if (weapon.kind === 'laser') {
+      this.fireLaser(weapon, damageScale);
+    } else if (weapon.kind === 'arc') {
+      this.fireArc(weapon, damageScale);
+    } else if (weapon.kind === 'pulse') {
+      this.firePulse(weapon, damageScale);
+    } else {
+      const center = (weapon.bullets - 1) / 2;
+      const speed = weapon.speed * this.loadout.stat.bulletSpeed;
+      const bulletSize = weapon.size * this.loadout.stat.bulletSize * (bigFire ? 1.7 : 1);
+      const damage = weapon.damage * damageScale;
+      for (let i = 0; i < weapon.bullets; i += 1) {
+        const angle = this.ship.angle + (i - center) * weapon.spread;
+        this.bullets.push({
+          x: ship.x + Math.cos(angle) * ship.r * 1.4,
+          y: ship.y + Math.sin(angle) * ship.r * 1.4,
+          px: ship.x,
+          py: ship.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          ttl: weapon.life,
+          r: bulletSize,
+          damage,
+          pierce: weapon.pierce || 1,
+          kind: weapon.kind || weapon.family,
+          homing: Number(weapon.homing || 0),
+        });
+      }
     }
     this.muzzleFlash();
     this.audio.shoot();
     return true;
   }
 
+  rayTarget(maxRange = 400, tolerance = 28) {
+    const ship = this.ship;
+    const dx = Math.cos(ship.angle);
+    const dy = Math.sin(ship.angle);
+    let best = null;
+    let bestAlong = Infinity;
+    for (const electron of this.electrons) {
+      if (electron.state !== 'orbit') continue;
+      const ex = electron.x - ship.x;
+      const ey = electron.y - ship.y;
+      const along = ex * dx + ey * dy;
+      if (along <= 0 || along > maxRange) continue;
+      const perpendicular = Math.abs(ex * dy - ey * dx);
+      if (perpendicular > tolerance) continue;
+      if (along < bestAlong) { best = electron; bestAlong = along; }
+    }
+    return best;
+  }
+
+  damageElectron(electron, damage, source = 'particle') {
+    if (!electron || electron.state !== 'orbit') return false;
+    electron.hp -= damage;
+    electron.hitFlash = 1;
+    this.audio.hit();
+    this.spark(electron.x, electron.y, 'electron');
+    this.hitRing(electron.x, electron.y, source === 'arc' ? '#8f6bd8' : source === 'laser' ? '#ef355d' : '#18aeb5');
+    if (electron.hp > 0) return false;
+    electron.state = 'loose';
+    this.orbitingRemaining = Math.max(0, this.orbitingRemaining - 1);
+    const angle = electron.angle;
+    electron.vx = Math.cos(angle) * rnd(55, 100);
+    electron.vy = Math.sin(angle) * rnd(55, 100);
+    electron.ttl = 8;
+    this.addScore(40);
+    if (!this.tutorial && Math.random() < 0.08) this.spawnPowerupAt(electron.x, electron.y);
+    return true;
+  }
+
+  addBeam(x1, y1, x2, y2, color, width = 4, ttl = .08) {
+    this.beams.push({ x1, y1, x2, y2, color, width, ttl });
+    if (this.beams.length > 36) this.beams.splice(0, this.beams.length - 36);
+  }
+
+  fireLaser(weapon, damageScale) {
+    const ship = this.ship;
+    const target = this.rayTarget(weapon.range, 22);
+    const endX = target ? target.x : ship.x + Math.cos(ship.angle) * weapon.range;
+    const endY = target ? target.y : ship.y + Math.sin(ship.angle) * weapon.range;
+    this.addBeam(ship.x, ship.y, endX, endY, '#ef4868', 4.5, .075);
+    if (target) this.damageElectron(target, weapon.damage * damageScale, 'laser');
+  }
+
+  fireArc(weapon, damageScale) {
+    const first = this.rayTarget(weapon.range, 52);
+    if (!first) {
+      const ship = this.ship;
+      this.addBeam(ship.x, ship.y, ship.x + Math.cos(ship.angle) * weapon.range * .55, ship.y + Math.sin(ship.angle) * weapon.range * .55, '#8f6bd8', 3, .1);
+      return;
+    }
+    let current = first;
+    let from = this.ship;
+    const visited = new Set();
+    for (let chain = 0; chain < weapon.chains && current; chain += 1) {
+      visited.add(current);
+      this.addBeam(from.x, from.y, current.x, current.y, chain ? '#a98cff' : '#7857d8', 4.5 - chain * .6, .14);
+      this.damageElectron(current, weapon.damage * damageScale * Math.pow(.82, chain), 'arc');
+      let next = null;
+      let nextDistance = Infinity;
+      for (const candidate of this.electrons) {
+        if (candidate.state !== 'orbit' || visited.has(candidate)) continue;
+        const d = Math.sqrt(dist2(current, candidate));
+        if (d <= weapon.chainRange && d < nextDistance) { next = candidate; nextDistance = d; }
+      }
+      from = current;
+      current = next;
+    }
+  }
+
+  firePulse(weapon, damageScale) {
+    const range = weapon.range * (this.hasPower('bigfire') ? 1.15 : 1);
+    this.pushParticle({ x:this.ship.x, y:this.ship.y, ttl:.34, type:'ring', radius:this.ship.r * 1.25, growth:(range - this.ship.r) / .34, color:'#2aa8d8' });
+    this.flashScreen('#2aa8d8', .025);
+    for (const electron of this.electrons) {
+      if (electron.state !== 'orbit') continue;
+      if (Math.sqrt(dist2(electron, this.ship)) <= range + 10) this.damageElectron(electron, weapon.damage * damageScale, 'pulse');
+    }
+  }
+
   update(dt) {
     this.elapsed += dt;
+    const worldDt = this.slowMoTimer > 0 ? dt * 0.34 : dt;
+    this.slowMoTimer = Math.max(0, this.slowMoTimer - dt);
     if (this.mode === 'marathon') this.marathonRunTime += dt;
-    this.input(dt);
+    this.input(worldDt);
 
     const ship = this.ship;
     const weapon = this.loadout.weapon;
-    ship.cooldown = Math.max(0, ship.cooldown - dt);
+    ship.cooldown = Math.max(0, ship.cooldown - worldDt);
     ship.invuln = Math.max(0, ship.invuln - dt);
     this.emptySoundCooldown = Math.max(0, this.emptySoundCooldown - dt);
     this.shieldFxCooldown = Math.max(0, this.shieldFxCooldown - dt);
     this.musicSyncClock = Math.max(0, this.musicSyncClock - dt);
     this.challengeMetrics.elapsed = this.elapsed;
-    ship.energy = Math.min(weapon.capacity, ship.energy + weapon.regen * (this.marathonModifier?.energyRegen || 1) * dt);
+    ship.energy = Math.min(weapon.capacity, ship.energy + weapon.regen * (this.marathonModifier?.energyRegen || 1) * worldDt);
 
-    this.updatePowerups(dt);
-    this.updatePhysics(dt);
-    this.updateHazards(dt);
+    this.updatePowerups(worldDt);
+    this.updatePhysics(worldDt);
+    this.updateHazards(worldDt);
     if (!this.running) return;
-    this.updateElectronPositions(dt);
-    this.updateBullets(dt);
-    this.updateNuclear(dt);
+    this.updateElectronPositions(worldDt);
+    this.updateBullets(worldDt);
+    this.updateNuclear(worldDt);
     if (!this.running) return;
-    this.updateParticles(dt);
+    this.updateParticles(worldDt);
+    for (const beam of this.beams) beam.ttl -= dt;
+    this.beams = this.beams.filter((beam) => beam.ttl > 0);
 
     if (this.phase === 'electrons' && this.orbitingRemaining === 0) {
       this.phase = 'unstable';
       this.challengeMetrics.electronClearTime ??= this.elapsed;
       this.unstableDuration = 1.25 * this.elementBehavior.instabilityTime;
       this.explosionTimer = this.unstableDuration;
+      this.slowMoTimer = .42;
       this.hooks.onObjective?.('The nucleus is unstable…');
-      this.flashScreen('#ef355d', .08);
+      this.pushParticle({ x:500, y:500, ttl:.5, type:'ring', radius:32, growth:280, color:'#ef355d' });
+      for (let i = 0; i < 18; i += 1) {
+        const angle = rnd(0, TAU);
+        const speed = rnd(65, 190);
+        this.pushParticle({x:500,y:500,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,ttl:rnd(.22,.5),type:i%2?'nucleus-red':'nucleus-blue'});
+      }
+      this.triggerShake(3.2);
+      this.flashScreen('#ef355d', .06);
       this.syncMusicState(true);
     }
 
@@ -732,6 +859,27 @@ export class AtomGame {
       bullet.ttl -= dt;
       bullet.px = bullet.x;
       bullet.py = bullet.y;
+
+      if (bullet.homing > 0) {
+        let target = null;
+        let targetD2 = Infinity;
+        for (const electron of this.electrons) {
+          if (electron.state !== 'orbit') continue;
+          const d = dist2(bullet, electron);
+          if (d < targetD2) { target = electron; targetD2 = d; }
+        }
+        if (target) {
+          const speed = Math.max(1, Math.hypot(bullet.vx, bullet.vy));
+          const desired = Math.atan2(target.y - bullet.y, target.x - bullet.x);
+          const current = Math.atan2(bullet.vy, bullet.vx);
+          const delta = ((desired - current + Math.PI * 3) % TAU) - Math.PI;
+          const turn = clamp(delta, -bullet.homing * dt, bullet.homing * dt);
+          const angle = current + turn;
+          bullet.vx = Math.cos(angle) * speed;
+          bullet.vy = Math.sin(angle) * speed;
+        }
+      }
+
       bullet.x += bullet.vx * dt;
       bullet.y += bullet.vy * dt;
       if (bullet.ttl <= 0) continue;
@@ -740,26 +888,9 @@ export class AtomGame {
         if (electron.state !== 'orbit') continue;
         const radius = bullet.r + 10;
         if (dist2(bullet, electron) >= radius * radius) continue;
-
-        electron.hp -= bullet.damage;
-        electron.hitFlash = 1;
+        this.damageElectron(electron, bullet.damage, bullet.kind);
         bullet.pierce -= 1;
         if (bullet.pierce <= 0) bullet.ttl = 0;
-        this.audio.hit();
-        this.spark(electron.x, electron.y, 'electron');
-        this.hitRing(electron.x, electron.y, '#18aeb5');
-
-        if (electron.hp <= 0) {
-          electron.state = 'loose';
-          this.orbitingRemaining = Math.max(0, this.orbitingRemaining - 1);
-          const angle = electron.angle;
-          electron.vx = Math.cos(angle) * rnd(55, 100);
-          electron.vy = Math.sin(angle) * rnd(55, 100);
-          electron.ttl = 8;
-          this.addScore(40);
-          if (!this.tutorial && Math.random() < 0.08) this.spawnPowerupAt(electron.x, electron.y);
-        }
-
         if (bullet.ttl <= 0) break;
       }
     }
@@ -778,8 +909,9 @@ export class AtomGame {
     this.collectionDuration = getCollectionWindow(this.element.z);
     this.collectionTimeLeft = this.collectionDuration;
     this.audio.explode();
-    this.triggerShake(12);
-    this.flashScreen('#ffffff', .2);
+    this.triggerShake(4.2);
+    this.flashScreen('#ffffff', .12);
+    this.pushParticle({ x:500, y:500, ttl:.7, type:'ring', radius:24, growth:420, color:'#ffffff' });
     this.hazards = [];
     this.nucleusBurst();
     this.syncMusicState(true);
@@ -1278,6 +1410,7 @@ export class AtomGame {
     this.drawPowerups(c);
     this.drawParticles(c);
     this.drawBullets(c);
+    this.drawBeams(c);
     this.drawShip(c);
     c.restore();
     if (this.screenFlash?.alpha > 0) {
@@ -1341,32 +1474,36 @@ export class AtomGame {
     if (this.phase !== 'post') {
       const radius = 28 + Math.sqrt(this.element.z) * 2.4;
       const blobs = clamp(Math.round(Math.sqrt(this.element.z) * 2), 4, 20);
-      const pulse = this.phase === 'unstable' ? (1 + Math.sin(this.explosionTimer * 26) * .08) : 1;
+      const stage = getNucleusDamageStage({ orbiting:this.orbitingRemaining, total:this.electrons.length, phase:this.phase });
+      const stageLevel = stage === 'intact' ? 0 : stage === 'cracked' ? 1 : stage === 'heavily-cracked' ? 2 : 3;
+      const instabilityPulse = stageLevel >= 3 ? Math.sin(this.elapsed * 10.5) * .065 : 0;
+      const pulse = 1 + instabilityPulse + (this.phase === 'unstable' ? Math.sin(this.explosionTimer * 26) * .055 : 0);
 
-      if (this.phase === 'strip') {
-        const warningPulse = 0.72 + Math.sin(this.t * 5.2) * 0.18;
-        const warningGlowRadius = radius + 26 + Math.sin(this.t * 3.6) * 6;
-        const glow = c.createRadialGradient(500, 500, radius * 0.35, 500, 500, warningGlowRadius);
-        glow.addColorStop(0, `rgba(239,53,93,${0.16 + warningPulse * 0.1})`);
-        glow.addColorStop(0.5, `rgba(239,53,93,${0.12 + warningPulse * 0.08})`);
-        glow.addColorStop(1, 'rgba(239,53,93,0)');
-        c.fillStyle = glow;
-        c.beginPath();
-        c.arc(500, 500, warningGlowRadius, 0, TAU);
-        c.fill();
+      // Persistent red hazard glow while the intact nucleus still occupies the lethal core.
+      // The warning intensifies with visual damage but does not affect gameplay.
+      const warningPulse = .72 + Math.sin(this.elapsed * (4.6 + stageLevel * .7)) * .18;
+      const warningGlowRadius = radius + 25 + stageLevel * 4 + Math.sin(this.elapsed * 3.6) * 5;
+      const glow = c.createRadialGradient(500, 500, radius * .25, 500, 500, warningGlowRadius);
+      glow.addColorStop(0, `rgba(239,53,93,${.13 + warningPulse * .08 + stageLevel * .025})`);
+      glow.addColorStop(.5, `rgba(239,53,93,${.09 + warningPulse * .06 + stageLevel * .02})`);
+      glow.addColorStop(1, 'rgba(239,53,93,0)');
+      c.fillStyle = glow;
+      c.beginPath();
+      c.arc(500, 500, warningGlowRadius, 0, TAU);
+      c.fill();
 
-        c.beginPath();
-        c.arc(500, 500, radius + 11 + Math.sin(this.t * 4.4) * 2.5, 0, TAU);
-        c.strokeStyle = `rgba(239,53,93,${0.34 + warningPulse * 0.2})`;
-        c.lineWidth = 5;
-        c.stroke();
-      }
+      c.beginPath();
+      c.arc(500, 500, radius + 11 + stageLevel * 1.5 + Math.sin(this.elapsed * 4.4) * 2.2, 0, TAU);
+      c.strokeStyle = `rgba(239,53,93,${.32 + warningPulse * .18 + stageLevel * .07})`;
+      c.lineWidth = 4.5 + stageLevel * .55;
+      c.stroke();
 
       for (let i = 0; i < blobs; i += 1) {
         const angle = i * 2.399;
         const radial = (i % 4) / 4 * radius * 0.55;
-        const x = 500 + Math.cos(angle) * radial;
-        const y = 500 + Math.sin(angle) * radial;
+        const fractureOffset = stageLevel >= 2 ? Math.sin(i * 11.7 + this.element.z) * stageLevel * 1.7 : 0;
+        const x = 500 + Math.cos(angle) * (radial + fractureOffset);
+        const y = 500 + Math.sin(angle) * (radial + fractureOffset);
         c.beginPath();
         c.arc(x, y, clamp(radius * 0.28, 9, 16) * pulse, 0, TAU);
         c.fillStyle = i % 2 ? '#ef355d' : '#2aa8d8';
@@ -1375,25 +1512,50 @@ export class AtomGame {
 
       c.beginPath();
       c.arc(500, 500, (radius + 5) * pulse, 0, TAU);
-      c.strokeStyle = this.phase === 'unstable' ? 'rgba(239,53,93,.9)' : 'rgba(255,255,255,.7)';
-      c.lineWidth = 3;
+      c.strokeStyle = stageLevel >= 3 ? 'rgba(239,53,93,.95)' : 'rgba(255,255,255,.7)';
+      c.lineWidth = 3 + stageLevel * .45;
       c.stroke();
 
-      if (this.phase === 'unstable') {
+      if (stageLevel >= 1) {
+        const crackCount = stageLevel === 1 ? 3 : stageLevel === 2 ? 7 : 10;
+        c.lineCap = 'round';
+        for (let i = 0; i < crackCount; i += 1) {
+          const angle = i * (TAU / crackCount) + this.element.z * .173;
+          const length = radius * (stageLevel === 1 ? .48 : stageLevel === 2 ? .7 : .88);
+          c.beginPath();
+          for (let step = 0; step < 5; step += 1) {
+            const rr = radius * .08 + length * (step / 4);
+            const jitter = Math.sin(i * 9.1 + step * 13.7) * radius * (.035 + stageLevel * .015);
+            const x = 500 + Math.cos(angle) * rr + Math.cos(angle + Math.PI / 2) * jitter;
+            const y = 500 + Math.sin(angle) * rr + Math.sin(angle + Math.PI / 2) * jitter;
+            if (step === 0) c.moveTo(x, y); else c.lineTo(x, y);
+          }
+          c.strokeStyle = stageLevel >= 3 ? 'rgba(255,244,218,.9)' : `rgba(33,48,60,${.5 + stageLevel * .14})`;
+          c.lineWidth = 1.5 + stageLevel * .75;
+          c.stroke();
+        }
+      }
+
+      if (stageLevel >= 2) {
+        c.fillStyle = `rgba(28,37,45,${stageLevel === 2 ? .18 : .28})`;
+        for (let i = 0; i < stageLevel + 1; i += 1) {
+          const angle = i * 2.17 + this.element.z * .11;
+          c.beginPath();
+          c.arc(500 + Math.cos(angle) * radius * .34, 500 + Math.sin(angle) * radius * .34, radius * (.08 + i * .018), 0, TAU);
+          c.fill();
+        }
+      }
+
+      if (stageLevel >= 3) {
         const duration = Math.max(.01, this.unstableDuration || 1.25);
-        const progress = clamp(1 - this.explosionTimer / duration, 0, 1);
-        c.strokeStyle = `rgba(255,255,255,${.25 + progress * .7})`;
-        c.lineWidth = 2.2;
+        const progress = this.phase === 'unstable' ? clamp(1 - this.explosionTimer / duration, 0, 1) : .32;
+        c.strokeStyle = `rgba(255,255,255,${.35 + progress * .55})`;
+        c.lineWidth = 2.1;
         for (let i = 0; i < 6; i += 1) {
           const angle = i * 1.047 + this.element.z * .137;
           c.beginPath();
-          for (let step = 0; step < 4; step += 1) {
-            const rr = radius * (.12 + step * .19 * progress);
-            const wobble = Math.sin(i * 7 + step * 11) * radius * .08;
-            const x = 500 + Math.cos(angle) * rr + Math.cos(angle + Math.PI / 2) * wobble;
-            const y = 500 + Math.sin(angle) * rr + Math.sin(angle + Math.PI / 2) * wobble;
-            if (step === 0) c.moveTo(x, y); else c.lineTo(x, y);
-          }
+          c.moveTo(500 + Math.cos(angle) * radius * .12, 500 + Math.sin(angle) * radius * .12);
+          c.lineTo(500 + Math.cos(angle + .09) * radius * (.58 + progress * .23), 500 + Math.sin(angle + .09) * radius * (.58 + progress * .23));
           c.stroke();
         }
       }
@@ -1460,13 +1622,37 @@ export class AtomGame {
       c.beginPath();
       c.moveTo(bullet.px ?? bullet.x, bullet.py ?? bullet.y);
       c.lineTo(bullet.x, bullet.y);
-      c.strokeStyle = this.hasPower('bigfire') ? 'rgba(239,107,53,.5)' : 'rgba(243,182,55,.35)';
-      c.lineWidth = Math.max(2, bullet.r * .8);
+      const rail = bullet.kind === 'rail';
+      const homing = bullet.kind === 'homing';
+      const trail = rail ? 'rgba(255,255,255,.72)' : homing ? 'rgba(143,107,216,.55)' : (this.hasPower('bigfire') ? 'rgba(239,107,53,.5)' : 'rgba(243,182,55,.35)');
+      const fill = rail ? '#f8fcff' : homing ? '#8f6bd8' : (this.hasPower('bigfire') ? '#ef6b35' : '#f3b637');
+      c.strokeStyle = trail;
+      c.lineWidth = rail ? 3 : Math.max(2, bullet.r * .8);
       c.stroke();
       c.beginPath();
       c.arc(bullet.x, bullet.y, bullet.r, 0, TAU);
-      c.fillStyle = this.hasPower('bigfire') ? '#ef6b35' : '#f3b637';
+      c.fillStyle = fill;
+      c.shadowBlur = rail ? 12 : homing ? 8 : 0;
+      c.shadowColor = fill;
       c.fill();
+      c.shadowBlur = 0;
+    }
+  }
+
+  drawBeams(c) {
+    for (const beam of this.beams) {
+      c.save();
+      c.globalAlpha = clamp(beam.ttl * 10, 0, 1);
+      c.strokeStyle = beam.color;
+      c.shadowColor = beam.color;
+      c.shadowBlur = 12;
+      c.lineWidth = beam.width;
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(beam.x1, beam.y1);
+      c.lineTo(beam.x2, beam.y2);
+      c.stroke();
+      c.restore();
     }
   }
 
@@ -1483,20 +1669,28 @@ export class AtomGame {
         c.moveTo(0, -r * 1.55); c.lineTo(r * .62, -r * .08); c.lineTo(r * 1.3, r * .58); c.lineTo(r * .45, r * .55); c.lineTo(0, r); c.lineTo(-r * .45, r * .55); c.lineTo(-r * 1.3, r * .58); c.lineTo(-r * .62, -r * .08); break;
       case 'nano2':
         c.moveTo(0, -r * 1.62); c.lineTo(r * .72, -r * .2); c.lineTo(r * 1.08, r * .95); c.lineTo(r * .28, r * .62); c.lineTo(0, r * .92); c.lineTo(-r * .28, r * .62); c.lineTo(-r * 1.08, r * .95); c.lineTo(-r * .72, -r * .2); break;
+      case 'quark':
+        c.moveTo(0, -r * 1.62); c.lineTo(r * .48, -r * .42); c.lineTo(r * 1.18, r * .38); c.lineTo(r * .46, r * .92); c.lineTo(0, r * .66); c.lineTo(-r * .46, r * .92); c.lineTo(-r * 1.18, r * .38); c.lineTo(-r * .48, -r * .42); break;
       default:
         c.moveTo(0, -r * 1.45); c.lineTo(r * .9, r * 1.05); c.lineTo(0, r * .55); c.lineTo(-r * .9, r * 1.05); break;
     }
     c.closePath();
   }
 
-  drawShipTexture(c, ship, r) {
+  drawShipTexture(c, ship, r, paint) {
     c.save();
     this.traceShipHull(c, ship.id, r);
     c.clip();
-    c.fillStyle = '#f9fcfd';
+    c.fillStyle = paint?.body || '#f9fcfd';
     c.fillRect(-r * 1.5, -r * 1.8, r * 3, r * 3.2);
-    c.fillStyle = '#ef355d';
+    c.fillStyle = paint?.accent || '#ef355d';
     c.beginPath(); c.moveTo(0, -r * .75); c.lineTo(r * .32, r * .35); c.lineTo(-r * .32, r * .35); c.closePath(); c.fill();
+    if (paint?.dynamic === 'prism') {
+      const hue = (this.element.z * 19 + this.elapsed * 24) % 360;
+      c.globalAlpha = .28;
+      c.fillStyle = `hsl(${hue} 78% 58%)`;
+      c.fillRect(-r * 1.5, -r * 1.8, r * 3, r * 3.2);
+    }
     c.restore();
   }
 
@@ -1506,24 +1700,47 @@ export class AtomGame {
     const ship = this.loadout.ship;
     const r = shipState.r;
     const sprite = this.shipSprites.get(ship.id);
+    const paint = findById(PAINTS, this.save?.selectedPaint || 'standard');
+    const dynamicTint = paint?.dynamic === 'prism'
+      ? `hsl(${(this.element.z * 19 + this.elapsed * 24) % 360} 78% 58%)`
+      : paint?.tint;
 
     c.save();
     c.translate(shipState.x, shipState.y);
     c.rotate(shipState.angle + Math.PI / 2);
     if (this.hasPower('ghost')) c.globalAlpha = .48;
+    if (paint?.glow) {
+      c.shadowColor = paint.glow;
+      c.shadowBlur = paint.id === 'radioactive-glow' ? 22 : 12;
+    }
 
     if (sprite?.complete && sprite.naturalWidth) {
       const size = r * 3.2;
       c.drawImage(sprite, -size / 2, -size / 2, size, size);
-    } else {
-      this.drawShipTexture(c, ship, r);
+      if (dynamicTint && Number(paint.tintAlpha || 0) > 0) {
+        c.save();
+        c.globalCompositeOperation = 'source-atop';
+        c.globalAlpha = Number(paint.tintAlpha || .18);
+        c.fillStyle = dynamicTint;
+        c.fillRect(-size / 2, -size / 2, size, size);
+        c.restore();
+      }
       this.traceShipHull(c, ship.id, r);
-      c.strokeStyle = '#2e9ea7';
+      c.strokeStyle = paint?.outline || '#2e9ea7';
+      c.lineWidth = Math.max(2, r * .16);
+      c.stroke();
+    } else {
+      this.drawShipTexture(c, ship, r, paint);
+      this.traceShipHull(c, ship.id, r);
+      c.strokeStyle = paint?.outline || '#2e9ea7';
       c.lineWidth = Math.max(3, r * .25);
       c.lineJoin = 'round';
       c.stroke();
     }
 
+    if (paint?.id === 'radioactive-glow') {
+      c.beginPath(); c.arc(0, 0, r * 1.55, 0, TAU); c.strokeStyle = 'rgba(156,232,81,.45)'; c.lineWidth = 2; c.stroke();
+    }
     if (this.hasPower('collect')) {
       c.beginPath(); c.arc(0, 0, r * 2.2, 0, TAU); c.strokeStyle = 'rgba(32,169,159,.55)'; c.lineWidth = 2; c.stroke();
     }

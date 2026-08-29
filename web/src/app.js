@@ -4,6 +4,7 @@ import {
   WEAPONS,
   ENGINES,
   MODULES,
+  PAINTS,
   findById,
 } from './data.js';
 import { AudioSystem } from './audio.js';
@@ -14,6 +15,8 @@ import {
   getAchievementProgress,
   evaluateAchievements,
   getElementMetadata,
+  evaluateProgressionRewards,
+  getProgressionRewardStatus,
 } from './progression.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -32,11 +35,13 @@ const CATEGORY_DATA = {
   weapons: WEAPONS,
   engines: ENGINES,
   modules: MODULES,
+  paints: PAINTS,
 };
 
 const unique = (values) => [...new Set(values.filter(Boolean))];
 
 let save = loadSave();
+evaluateProgressionRewards(save);
 let currentScreen = 'splash';
 let shopTab = 'ships';
 let gameContext = null;
@@ -52,9 +57,11 @@ const game = new AtomGame($('#game-canvas'), audio, {
   onObjective: (text) => { $('#objective').textContent = text; },
   onCurrency: () => {
     const unlocked = checkAchievements();
+    const rewards = evaluateProgressionRewards(save);
     persist();
     updateWallets();
     notifyAchievements(unlocked);
+    notifyProgressionRewards(rewards);
   },
   onMessage: (message) => toast(message, 2600),
   onMarathonState: (state) => {
@@ -62,8 +69,10 @@ const game = new AtomGame($('#game-canvas'), audio, {
     save.marathonResume = normalizeMarathonState(state);
     if (state?.runTime && save.stats) save.stats.marathonBestTime = Math.max(save.stats.marathonBestTime || 0, state.runTime);
     const unlocked = checkAchievements();
+    const rewards = evaluateProgressionRewards(save);
     persist();
     notifyAchievements(unlocked);
+    notifyProgressionRewards(rewards);
   },
   onPause: showPause,
   onComplete: levelComplete,
@@ -71,6 +80,7 @@ const game = new AtomGame($('#game-canvas'), audio, {
 });
 
 function persist() {
+  evaluateProgressionRewards(save);
   localStorage.setItem('atom-shooter-save', JSON.stringify(save));
 }
 
@@ -89,6 +99,16 @@ function achievementMarkup(unlocked) {
   return `<div class="unlock-summary"><b>Achievement unlocked</b><span>${unlocked.map((item) => item.title).join(', ')}</span></div>`;
 }
 
+function progressionRewardMarkup(unlocked) {
+  if (!unlocked?.length) return '';
+  return `<div class="unlock-summary reward"><b>Reward unlocked</b><span>${unlocked.map((item) => item.title).join(', ')}</span></div>`;
+}
+
+function notifyProgressionRewards(unlocked) {
+  if (!unlocked?.length) return;
+  toast(`Reward unlocked: ${unlocked.map((item) => item.title).join(', ')}`, 3400);
+}
+
 function getShopAssetPath(tab, itemOrId) {
   const item = typeof itemOrId === 'string'
     ? CATEGORY_DATA[tab].find((entry) => entry.id === itemOrId)
@@ -99,6 +119,9 @@ function getShopAssetPath(tab, itemOrId) {
 
 function itemPreviewMarkup(tab, item, options = {}) {
   const className = options.small ? 'slot-icon' : 'shop-item-preview';
+  if (tab === 'paints') {
+    return `<div class="${className} paint-preview" aria-hidden="true" style="--paint-body:${item.body};--paint-accent:${item.accent};--paint-outline:${item.outline};--paint-glow:${item.glow || 'transparent'}"><span class="paint-ship">▲</span><i></i></div>`;
+  }
   return `<div class="${className}" aria-hidden="true"><img src="${getShopAssetPath(tab, item)}" alt="" loading="lazy"></div>`;
 }
 
@@ -188,15 +211,20 @@ function shopStats(tab, item) {
     return `<span class="chip">Mass ${item.mass.toFixed(2)}</span><span class="chip">Size ×${item.size}</span><span class="chip">Slots ${item.slots}</span><span class="chip">Nucleus pull ×${item.gravity}</span><span class="chip">Pickup ×${item.pickup}</span>${special}`;
   }
   if (tab === 'weapons') {
-    const range = Math.round(item.speed * item.life);
-    const trigger = item.continuous ? 'Continuous' : 'Manual burst';
+    const trigger = item.continuous ? 'Continuous' : 'Manual';
     const tierTotal = item.tierTotal || 3;
-    return `<span class="chip">Tier ${item.tier}/${tierTotal}</span><span class="chip">${item.bullets} projectile${item.bullets === 1 ? '' : 's'}</span><span class="chip">${item.rate.toFixed(1)}/s</span><span class="chip">Speed ${Math.round(item.speed)}</span><span class="chip">Range ${range}</span><span class="chip">Damage ${item.damage}</span><span class="chip">Energy ${item.capacity}</span><span class="chip">Restore ${item.regen}/s</span><span class="chip">Limit ${item.bulletLimit}</span><span class="chip">${trigger}</span>`;
+    if (item.kind === 'laser') return `<span class="chip">Continuous beam</span><span class="chip">Range ${item.range}</span><span class="chip">${item.rate.toFixed(1)} ticks/s</span><span class="chip">Energy ${item.capacity}</span><span class="chip">Restore ${item.regen}/s</span>`;
+    if (item.kind === 'arc') return `<span class="chip">Chain ×${item.chains}</span><span class="chip">Range ${item.range}</span><span class="chip">Chain range ${item.chainRange}</span><span class="chip">Damage ${item.damage}</span><span class="chip">${trigger}</span>`;
+    if (item.kind === 'pulse') return `<span class="chip">Radial ${item.range}px</span><span class="chip">Damage ${item.damage}</span><span class="chip">${item.rate.toFixed(2)}/s</span><span class="chip">Close range</span>`;
+    const range = Math.round(item.speed * item.life);
+    const special = item.kind === 'homing' ? '<span class="chip">Homing</span>' : item.kind === 'rail' ? '<span class="chip">Pierce ×8</span>' : '';
+    return `<span class="chip">Tier ${item.tier}/${tierTotal}</span><span class="chip">${item.bullets} projectile${item.bullets === 1 ? '' : 's'}</span><span class="chip">${item.rate.toFixed(1)}/s</span><span class="chip">Speed ${Math.round(item.speed)}</span><span class="chip">Range ${range}</span><span class="chip">Damage ${item.damage}</span><span class="chip">Energy ${item.capacity}</span><span class="chip">Restore ${item.regen}/s</span>${special}`;
   }
   if (tab === 'engines') {
     const tier = ENGINES.indexOf(item) + 1;
     return `<span class="chip">Stage ${tier}/5</span><span class="chip">Force ×${item.thrust}</span><span class="chip">Max speed ×${item.max}</span>`;
   }
+  if (tab === 'paints') return `<span class="chip">Cosmetic only</span><span class="chip">${item.unlock}</span>`;
   const effectLabels = {
     pickup: `Pickup field ×${item.value}`,
     gravity: `Nucleus pull ×${item.value}`,
@@ -216,27 +244,33 @@ function renderShop() {
   root.innerHTML = '';
 
   for (const item of list) {
-    const owned = save.purchased[shopTab].includes(item.id);
+    const paintTab = shopTab === 'paints';
+    const owned = paintTab ? save.unlockedPaints.includes(item.id) : save.purchased[shopTab].includes(item.id);
     const selected = isSelected(shopTab, item.id);
-    const canAfford = save.electrons >= item.costE && save.neutrons >= item.costN;
-    const prerequisiteOwned = !item.requires || save.purchased[shopTab].includes(item.requires);
+    const rewardLocked = Boolean(item.rewardOnly && !owned);
+    const canAfford = paintTab || (save.electrons >= item.costE && save.neutrons >= item.costN);
+    const prerequisiteOwned = paintTab || !item.requires || save.purchased[shopTab].includes(item.requires);
     const card = document.createElement('article');
-    card.className = `item-card ${selected ? 'selected' : ''} ${item.tier ? `tier-${item.tier}` : ''}`;
+    card.className = `item-card ${selected ? 'selected' : ''} ${item.tier ? `tier-${item.tier}` : ''} ${rewardLocked ? 'reward-locked' : ''}`;
 
-    let label = 'Buy';
-    let disabled = false;
-    if (!owned && !prerequisiteOwned) {
+    let label = paintTab ? (owned ? (selected ? 'Equipped' : 'Equip paint') : item.unlock) : 'Buy';
+    let disabled = paintTab ? !owned : false;
+    if (!paintTab && rewardLocked) {
+      label = item.reward || 'Progression reward';
+      disabled = true;
+    } else if (!paintTab && !owned && !prerequisiteOwned) {
       label = `Requires ${prerequisiteName(shopTab, item)}`;
       disabled = true;
-    } else if (!owned && !canAfford) {
+    } else if (!paintTab && !owned && !canAfford) {
       label = 'Not enough particles';
       disabled = true;
-    } else if (owned) {
+    } else if (!paintTab && owned) {
       label = selected ? 'Equipped' : (shopTab === 'modules' ? 'Equip module' : 'Equip');
     }
 
     const family = item.family ? `<span class="family-label">${item.family.toUpperCase()} • ${item.tier}/${item.tierTotal || 3}</span>` : '';
-    card.innerHTML = `${itemPreviewMarkup(shopTab, item)}${family}<h3>${item.name}</h3><p>${item.desc}</p><div class="stats">${shopStats(shopTab, item)}</div><div class="price"><span><i class="e-dot"></i>${item.costE}</span><span><i class="n-dot"></i>${item.costN}</span></div><button class="${!owned ? 'primary' : ''}" ${disabled ? 'disabled' : ''}>${label}</button>`;
+    const price = paintTab || item.rewardOnly ? `<div class="price reward-price"><span>${owned ? 'Unlocked' : 'Reward'}</span></div>` : `<div class="price"><span><i class="e-dot"></i>${item.costE}</span><span><i class="n-dot"></i>${item.costN}</span></div>`;
+    card.innerHTML = `${itemPreviewMarkup(shopTab, item)}${family}<h3>${item.name}</h3><p>${item.desc}</p><div class="stats">${shopStats(shopTab, item)}</div>${price}<button class="${!owned && !rewardLocked ? 'primary' : ''}" ${disabled ? 'disabled' : ''}>${label}</button>`;
     card.querySelector('button').addEventListener('click', () => buyOrEquip(shopTab, item));
     root.appendChild(card);
   }
@@ -248,6 +282,7 @@ function isSelected(tab, id) {
   if (tab === 'ships') return save.selectedShip === id;
   if (tab === 'weapons') return save.selectedWeapon === id;
   if (tab === 'engines') return save.selectedEngine === id;
+  if (tab === 'paints') return save.selectedPaint === id;
   return save.selectedModules.includes(id);
 }
 
@@ -266,7 +301,19 @@ function sanitizeSelectedModules() {
 }
 
 function buyOrEquip(tab, item) {
+  if (tab === 'paints') {
+    if (!save.unlockedPaints.includes(item.id)) return;
+    save.selectedPaint = item.id;
+    persist();
+    renderShop();
+    toast(`${item.name} equipped`);
+    return;
+  }
   const owned = save.purchased[tab].includes(item.id);
+  if (item.rewardOnly && !owned) {
+    toast(item.reward || 'Complete its progression reward first');
+    return;
+  }
   if (!owned) {
     if (item.requires && !save.purchased[tab].includes(item.requires)) {
       toast(`Buy ${prerequisiteName(tab, item)} first`);
@@ -317,21 +364,24 @@ function buyOrEquip(tab, item) {
   }
 
   const unlockedAchievements = checkAchievements();
+  const unlockedRewards = evaluateProgressionRewards(save);
   persist();
   renderShop();
   updateWallets();
   notifyAchievements(unlockedAchievements);
+  notifyProgressionRewards(unlockedRewards);
 }
 
 function renderLoadout() {
   const ship = findById(SHIPS, save.selectedShip);
   const weapon = findById(WEAPONS, save.selectedWeapon);
   const engine = findById(ENGINES, save.selectedEngine);
+  const paint = findById(PAINTS, save.selectedPaint);
   const mods = save.selectedModules.map((id) => MODULES.find((module) => module.id === id)).filter(Boolean);
   const special = ship.builtinPickup
     ? '<span class="slot built-in"><span class="slot-plus">◎</span><span>Built-in Collector</span></span>'
     : '';
-  $('#loadout-panel').innerHTML = `<b>${ship.name}</b><div class="slots">${loadoutSlotMarkup('engines', engine)}${loadoutSlotMarkup('weapons', weapon)}${special}${mods.map((module) => loadoutSlotMarkup('modules', module)).join('')}${Array.from({ length: Math.max(0, ship.slots - mods.length) }, () => '<span class="slot empty"><span class="slot-plus">+</span><span>Empty slot</span></span>').join('')}</div>`;
+  $('#loadout-panel').innerHTML = `<b>${ship.name} • ${paint.name}</b><div class="slots">${loadoutSlotMarkup('engines', engine)}${loadoutSlotMarkup('weapons', weapon)}${special}${mods.map((module) => loadoutSlotMarkup('modules', module)).join('')}${Array.from({ length: Math.max(0, ship.slots - mods.length) }, () => '<span class="slot empty"><span class="slot-plus">+</span><span>Empty slot</span></span>').join('')}</div>`;
 }
 
 function startGame(index, mode, tutorial = false, marathonState = null) {
@@ -481,7 +531,9 @@ function comparisonMarkup(previous, score) {
 function affordableItemsMarkup() {
   const affordable = [];
   for (const [tab, items] of Object.entries(CATEGORY_DATA)) {
+    if (tab === 'paints') continue;
     for (const item of items) {
+      if (item.rewardOnly) continue;
       if (save.purchased[tab].includes(item.id)) continue;
       if (item.requires && !save.purchased[tab].includes(item.requires)) continue;
       if (save.electrons < item.costE || save.neutrons < item.costN) continue;
@@ -533,10 +585,11 @@ function levelComplete(result) {
     save.marathonResume = null;
     const comparison = finishMarathonRun(result.marathonState, true);
     const unlockedAchievements = checkAchievements();
+    const unlockedRewards = evaluateProgressionRewards(save);
     persist();
     showModal(
       'Marathon Complete!',
-      `<p>You cleared all 118 elements.</p><p><b>${result.score.toLocaleString()} points</b> • ${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}${achievementMarkup(unlockedAchievements)}`,
+      `<p>You cleared all 118 elements.</p><p><b>${result.score.toLocaleString()} points</b> • ${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}${achievementMarkup(unlockedAchievements)}${progressionRewardMarkup(unlockedRewards)}`,
       [
         { label: 'Records', fn: () => { closeModal(); showScreen('records'); } },
         { label: 'Main menu', primary: true, fn: () => { closeModal(); showScreen('main'); } },
@@ -570,13 +623,14 @@ function levelComplete(result) {
   }
   const challengeMarkup = applyChallengeRewards(result);
   const unlockedAchievements = checkAchievements();
+  const unlockedRewards = evaluateProgressionRewards(save);
   persist();
 
   const next = result.element.z < 118 ? result.element.z : null;
   const record = save.records[result.element.z];
   showModal(
     'Level Completed!',
-    `<p><b>${result.element.name}</b> destabilized.</p><p>${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)} &nbsp; ${formatTime(result.time)} &nbsp; Score ${result.levelScore.toLocaleString()} &nbsp; Neutrons ${result.neutrons}</p>${comparisonMarkup(previous, result.levelScore)}<p class="best-line">Best: ${record.score.toLocaleString()} pts • ${formatTime(record.time)} • ${record.neutrons} neutrons</p>${challengeMarkup}${achievementMarkup(unlockedAchievements)}${affordableItemsMarkup()}`,
+    `<p><b>${result.element.name}</b> destabilized.</p><p>${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)} &nbsp; ${formatTime(result.time)} &nbsp; Score ${result.levelScore.toLocaleString()} &nbsp; Neutrons ${result.neutrons}</p>${comparisonMarkup(previous, result.levelScore)}<p class="best-line">Best: ${record.score.toLocaleString()} pts • ${formatTime(record.time)} • ${record.neutrons} neutrons</p>${challengeMarkup}${achievementMarkup(unlockedAchievements)}${progressionRewardMarkup(unlockedRewards)}${affordableItemsMarkup()}`,
     [
       { label: 'Main menu', fn: () => { closeModal(); showScreen('main'); } },
       ...(next !== null
@@ -622,10 +676,11 @@ function gameOver(result) {
     save.marathonResume = null;
     const comparison = finishMarathonRun(result.marathonState, false);
     const unlockedAchievements = checkAchievements();
+    const unlockedRewards = evaluateProgressionRewards(save);
     persist();
     showModal(
       'Marathon Over!',
-      `<p>${explanation}</p><p>Score: <b>${result.score.toLocaleString()}</b> • Reached ${result.element.name}</p><p>${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}${achievementMarkup(unlockedAchievements)}`,
+      `<p>${explanation}</p><p>Score: <b>${result.score.toLocaleString()}</b> • Reached ${result.element.name}</p><p>${formatTime(result.marathonState?.runTime || result.time)} • ${result.marathonState?.runNeutrons || 0} neutrons</p>${comparison}${achievementMarkup(unlockedAchievements)}${progressionRewardMarkup(unlockedRewards)}`,
       [
         { label: 'Main menu', fn: () => { closeModal(); showScreen('main'); } },
         { label: 'New Marathon', primary: true, fn: () => { closeModal(); startGame(0, 'marathon', false, null); } },
@@ -762,7 +817,7 @@ function runShopTutorial() {
   const box = $('#shop-tutorial');
   const steps = [
     { text: '<b>This is the shop.</b> Your current ship, weapon, engine, modules and particle wallet all meet here.', focus: '#shop-tabs' },
-    { text: 'Use these category tabs to switch between Ships, Weapons, Engines and Modules.', focus: '#shop-tabs' },
+    { text: 'Use these category tabs to switch between Ships, Weapons, Engines, Modules and Paint.', focus: '#shop-tabs' },
     { text: 'Every item card shows its description, important stats and electron/neutron price. Upgrade stages must be bought in order.', focus: '#shop-grid .item-card' },
     { text: 'Weapon families and module families have upgrade tiers. A higher module tier replaces the lower equipped tier instead of stacking with it.', focus: '#shop-grid .item-card' },
     { text: 'The loadout bar shows what is equipped and how many module slots remain on the selected ship.', focus: '#loadout-panel' },
@@ -829,6 +884,14 @@ function renderAchievements() {
       : `${Math.round(progress.current).toLocaleString()} / ${Math.round(progress.target).toLocaleString()}`;
     return `<article class="achievement-card ${unlocked ? 'unlocked' : 'locked'}"><div class="achievement-mark">${unlocked ? '✓' : ''}</div><div><small>${unlocked ? 'UNLOCKED' : 'IN PROGRESS'}</small><h3>${achievement.title}</h3><p>${achievement.description}</p><div class="achievement-progress"><i style="width:${Math.min(100, percent)}%"></i></div><span>${progressLabel}</span></div></article>`;
   }).join('');
+  const groups = getProgressionRewardStatus(save);
+  root.insertAdjacentHTML('beforeend', `<section class="completion-rewards"><h3>Periodic-table rewards</h3>
+    <div><b>Alkali metals</b><span>${groups.alkali.current}/${groups.alkali.target}</span><small>Alkali Stabilizer + paint</small></div>
+    <div><b>Noble gases</b><span>${groups.noble.current}/${groups.noble.target}</span><small>Noble Aurora paint</small></div>
+    <div><b>Transition metals</b><span>${groups.transition.current}/${groups.transition.target}</span><small>Rail Cannon</small></div>
+    <div><b>Radioactive elements</b><span>${groups.radioactive.current}/${groups.radioactive.target}</span><small>Achievement + Radioactive Glow</small></div>
+    <div><b>Entire table</b><span>${groups.full.current}/${groups.full.target}</span><small>Quark ship + Periodic Prism</small></div>
+  </section>`);
 }
 
 function renderCodex() {
