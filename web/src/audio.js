@@ -18,8 +18,6 @@ export class AudioSystem {
     this.master = null;
     this.sfxBus = null;
     this.musicBus = null;
-    this.sfx = true;
-    this.music = true;
     this.sfxVolume = 1;
     this.musicVolume = 1;
     this.musicTimer = null;
@@ -34,13 +32,11 @@ export class AudioSystem {
     this.visibilityBound = false;
   }
 
-  configure({ sfx, music, sfxVolume = 1, musicVolume = 1 }) {
-    this.sfx = Boolean(sfx);
-    this.music = Boolean(music);
+  configure({ sfxVolume = 1, musicVolume = 1 }) {
     this.sfxVolume = clamp01(sfxVolume);
     this.musicVolume = clamp01(musicVolume);
     this.applyVolumeSettings();
-    if (!this.music) this.stopMusic();
+    if (this.musicVolume <= 0) this.stopMusic();
   }
 
   applyVolumeSettings() {
@@ -73,7 +69,7 @@ export class AudioSystem {
 
     if (!this.visibilityBound) {
       document.addEventListener('visibilitychange', () => {
-        if (!this.music) return;
+        if (this.musicVolume <= 0) return;
         if (document.hidden) this.stopMusic(false);
         else this.unlock();
       });
@@ -93,7 +89,7 @@ export class AudioSystem {
       return false;
     }
 
-    if (this.music) await this.startMusic();
+    if (this.musicVolume > 0) await this.startMusic();
     return ctx.state === 'running';
   }
 
@@ -103,7 +99,7 @@ export class AudioSystem {
     this.musicMode = next;
     this.musicStep = 0;
 
-    if (this.music && this.ctx?.state === 'running' && !document.hidden) {
+    if (this.musicVolume > 0 && this.ctx?.state === 'running' && !document.hidden) {
       this.stopMusic(false);
       void this.startMusic();
     }
@@ -135,7 +131,7 @@ export class AudioSystem {
   }
 
   tone(freq = 440, dur = 0.08, type = 'sine', vol = 0.2, slide = 0) {
-    if (!this.sfx) return;
+    if (this.sfxVolume <= 0) return;
     const ctx = this.ensure();
     if (!ctx || !this.sfxBus) return;
 
@@ -235,7 +231,7 @@ export class AudioSystem {
   }
 
   tickFallbackMusic() {
-    if (!this.music || document.hidden) return;
+    if (this.musicVolume <= 0 || document.hidden) return;
     const pattern = this.musicMode === 'marathon'
       ? [220, 329.63, 440, 369.99, 246.94, 369.99, 493.88, 440]
       : [110, 164.81, 220, 164.81, 123.47, 185, 246.94, 185, 98, 146.83, 196, 146.83];
@@ -252,14 +248,14 @@ export class AudioSystem {
   }
 
   async startMusic() {
-    if (!this.music || this.musicRunning || !this.ctx || this.ctx.state !== 'running' || document.hidden) return;
+    if (this.musicVolume <= 0 || this.musicRunning || !this.ctx || this.ctx.state !== 'running' || document.hidden) return;
 
     const requestId = ++this.musicRequestId;
     const mode = this.musicMode;
     const track = MUSIC_TRACKS[mode];
     const buffer = await this.loadMusicBuffer(mode);
 
-    if (requestId !== this.musicRequestId || !this.music || document.hidden || this.musicMode !== mode) return;
+    if (requestId !== this.musicRequestId || this.musicVolume <= 0 || document.hidden || this.musicMode !== mode) return;
 
     if (!buffer || typeof this.ctx.createBufferSource !== 'function') {
       this.startFallbackMusic();

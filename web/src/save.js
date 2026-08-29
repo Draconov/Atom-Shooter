@@ -23,8 +23,6 @@ export const DEFAULT_SAVE = {
   marathonHistory: [],
   marathonResume: null,
   settings: {
-    sfx: true,
-    music: true,
     sfxVolume: 1,
     musicVolume: 1,
     side: 'right',
@@ -90,9 +88,9 @@ export function normalizeSave(stored) {
   ensureOwned(purchased, 'engines', selectedEngine);
 
   const settings = { ...DEFAULT_SAVE.settings, ...plainObject(stored.settings) };
+  delete settings.sfx;
+  delete settings.music;
   if (!CONTROL_MODES.has(settings.controlMode)) settings.controlMode = DEFAULT_SAVE.settings.controlMode;
-  settings.sfx = Boolean(settings.sfx);
-  settings.music = Boolean(settings.music);
   settings.sfxVolume = Math.max(0, Math.min(1, Number(settings.sfxVolume) || 0));
   settings.musicVolume = Math.max(0, Math.min(1, Number(settings.musicVolume) || 0));
 

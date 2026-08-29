@@ -3,7 +3,7 @@
 
 # ATOM SHOOTER
 
-**A modern remake of the original 2013 Android arcade game.**
+**Arcade game that teaches you chemistry.**
 
 [![Play Web Version](https://img.shields.io/badge/PLAY-WEB%20VERSION-14a8b2?style=for-the-badge&logo=github)](https://draconov.github.io/Atom-Shooter/)
 [![Download Atom-Shooter.exe](https://img.shields.io/badge/DOWNLOAD-ATOM--SHOOTER.EXE-ef355d?style=for-the-badge&logo=windows)](https://github.com/Draconov/Atom-Shooter/releases/latest/download/Atom-Shooter.exe)

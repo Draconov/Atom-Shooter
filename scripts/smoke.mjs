@@ -269,6 +269,10 @@ assert(loadedLegacy.unlocked === DEFAULT_SAVE.unlocked && loadedLegacy.electrons
 const indexSource = fs.readFileSync('web/index.html', 'utf8');
 assert(indexSource.includes('id="setting-sfx-volume"'), 'Options must expose a sound effects volume slider');
 assert(indexSource.includes('id="setting-music-volume"'), 'Options must expose a music volume slider');
+assert(!indexSource.includes('id="setting-sfx"'), 'Options must not expose a redundant SFX toggle');
+assert(!indexSource.includes('id="setting-music"'), 'Options must not expose a redundant music toggle');
+assert(!indexSource.includes('Adjust sound-effect loudness') && !indexSource.includes('Adjust soundtrack loudness'), 'Volume helper copy should stay removed');
+assert(!indexSource.includes('Reference-style combined analog'), 'Control-mode helper copy should stay removed');
 assert(appSource.includes("'setting-sfx-volume'") && appSource.includes("'setting-music-volume'"), 'Volume sliders must save live through the settings input handlers');
 assert(indexSource.includes('atom-shooter-favicon.ico?v=120-flat'), 'Website must use the cache-breaking flat favicon');
 assert(indexSource.includes('atom-shooter-icon-192.png?v=120-flat'), 'Website must use the cache-breaking flat app icon');
@@ -343,7 +347,7 @@ globalThis.document = { hidden: false, addEventListener() {} };
 globalThis.window = { AudioContext: FakeAudioContext, setInterval };
 
 const audio = new AudioSystem();
-audio.configure({ sfx: true, music: true, sfxVolume: 0.5, musicVolume: 0.25 });
+audio.configure({ sfxVolume: 0.5, musicVolume: 0.25 });
 audio.setMusicMode('level');
 assert(audio.musicMode === 'level', 'Audio system must switch to the ambient level soundtrack');
 audio.setMusicMode('marathon');
@@ -353,10 +357,13 @@ assert(audio.musicMode === 'menu', 'Audio system must switch back to the menu OS
 assert(await audio.unlock(), 'Audio system should unlock after a user-gesture resume');
 assert(Math.abs(audio.sfxBus.gain.value - 0.36) < 1e-9, 'SFX volume must scale the SFX bus live');
 assert(Math.abs(audio.musicBus.gain.value - 0.095) < 1e-9, 'Music volume must scale the music bus live');
-audio.configure({ sfx: true, music: true, sfxVolume: 1, musicVolume: 1 });
+audio.configure({ sfxVolume: 1, musicVolume: 1 });
 assert(Math.abs(audio.sfxBus.gain.value - 0.72) < 1e-9, 'SFX volume must restore to full configured level');
 assert(Math.abs(audio.musicBus.gain.value - 0.38) < 1e-9, 'Music volume must restore to full configured level');
-assert(audio.musicRunning, 'Music scheduler should start after audio unlock when music is enabled');
+assert(audio.musicRunning, 'Music scheduler should start after audio unlock when music volume is above zero');
+audio.configure({ sfxVolume: 0, musicVolume: 0 });
+assert(audio.sfxBus.gain.value === 0, 'SFX volume 0% must fully mute the SFX bus');
+assert(audio.musicBus.gain.value === 0 && !audio.musicRunning, 'Music volume 0% must mute and stop music playback');
 audio.powerup();
 audio.extraLife();
 audio.stopMusic();

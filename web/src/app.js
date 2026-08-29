@@ -780,8 +780,6 @@ function showAbout() {
 
 function syncSettings() {
   const settings = save.settings;
-  $('#setting-sfx').checked = settings.sfx;
-  $('#setting-music').checked = settings.music;
   $('#setting-sfx-volume').value = Math.round(settings.sfxVolume * 100);
   $('#setting-music-volume').value = Math.round(settings.musicVolume * 100);
   $('#setting-sfx-volume-value').textContent = `${Math.round(settings.sfxVolume * 100)}%`;
@@ -794,8 +792,6 @@ function syncSettings() {
 
 function saveSettings() {
   save.settings = {
-    sfx: $('#setting-sfx').checked,
-    music: $('#setting-music').checked,
     sfxVolume: Number($('#setting-sfx-volume').value) / 100,
     musicVolume: Number($('#setting-music-volume').value) / 100,
     side: $('#setting-side').value,
@@ -807,7 +803,7 @@ function saveSettings() {
   $('#setting-sfx-volume-value').textContent = `${Math.round(save.settings.sfxVolume * 100)}%`;
   $('#setting-music-volume-value').textContent = `${Math.round(save.settings.musicVolume * 100)}%`;
   audio.configure(save.settings);
-  if (save.settings.music) audio.unlock();
+  if (save.settings.musicVolume > 0) audio.unlock();
   persist();
   applyControlSettings();
 }
@@ -878,7 +874,7 @@ $$('#shop-tabs button').forEach((button) => button.addEventListener('click', () 
   renderShop();
 }));
 
-for (const id of ['setting-sfx', 'setting-sfx-volume', 'setting-music', 'setting-music-volume', 'setting-side', 'setting-stick', 'setting-deadzone', 'setting-control']) {
+for (const id of ['setting-sfx-volume', 'setting-music-volume', 'setting-side', 'setting-stick', 'setting-deadzone', 'setting-control']) {
   $(`#${id}`).addEventListener('input', saveSettings);
 }
 
