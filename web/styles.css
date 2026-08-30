@@ -127,6 +127,50 @@ button.danger, .danger { color: #b22949; }
 .state-dot.open { background: var(--accent); }
 .state-dot.locked { background: #bac5c9; }
 
+.table-tools { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
+.element-groups-toggle {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 7px 11px;
+  border-radius: 18px; background: rgba(255,255,255,.9); color: var(--ink); white-space: nowrap;
+}
+.element-groups-toggle .toggle-track {
+  position: relative; width: 30px; height: 18px; flex: 0 0 auto; border-radius: 999px;
+  background: #cbd5d9; transition: background .16s ease;
+}
+.element-groups-toggle .toggle-track i {
+  position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(35,52,58,.2); transition: transform .16s ease;
+}
+.element-groups-toggle.active .toggle-track { background: var(--accent); }
+.element-groups-toggle.active .toggle-track i { transform: translateX(12px); }
+
+/* Optional chemical-family colors for the Classic periodic table. */
+.periodic-table.show-groups .element-cell {
+  background: var(--group-bg); border-color: var(--group-border); color: var(--group-ink, var(--ink));
+}
+.periodic-table.show-groups .element-cell .z { color: color-mix(in srgb, var(--group-ink, var(--ink)) 65%, transparent); }
+.periodic-table.show-groups .element-cell.locked { opacity: .42; filter: none; }
+.periodic-table.show-groups .element-cell.completed {
+  box-shadow: inset 0 0 0 2px rgba(20,168,178,.2);
+}
+.periodic-table.show-groups .element-cell.current {
+  box-shadow: inset 0 -4px 0 var(--accent2), inset 0 0 0 2px rgba(20,168,178,.2);
+}
+.element-cell[data-group="alkali"], .group-legend i[data-group="alkali"] { --group-bg:#dbe5ff; --group-border:#8ea6de; --group-ink:#173b7a; }
+.element-cell[data-group="alkaline"], .group-legend i[data-group="alkaline"] { --group-bg:#dcecf6; --group-border:#8fb5cb; --group-ink:#285e7b; }
+.element-cell[data-group="transition"], .group-legend i[data-group="transition"] { --group-bg:#d9eff0; --group-border:#83bdc1; --group-ink:#256b70; }
+.element-cell[data-group="lanthanide"], .group-legend i[data-group="lanthanide"] { --group-bg:#dbefe7; --group-border:#88bfa9; --group-ink:#2f6e5a; }
+.element-cell[data-group="actinide"], .group-legend i[data-group="actinide"] { --group-bg:#e1eed8; --group-border:#9fbc8b; --group-ink:#4e7041; }
+.element-cell[data-group="post-transition"], .group-legend i[data-group="post-transition"] { --group-bg:#ececbf; --group-border:#c4c16e; --group-ink:#6b681f; }
+.element-cell[data-group="metalloid"], .group-legend i[data-group="metalloid"] { --group-bg:#f3e6b9; --group-border:#d3b65c; --group-ink:#745817; }
+.element-cell[data-group="nonmetal"], .group-legend i[data-group="nonmetal"] { --group-bg:#f7dfbd; --group-border:#dea55c; --group-ink:#784915; }
+.element-cell[data-group="halogen"], .group-legend i[data-group="halogen"] { --group-bg:#f8d7c9; --group-border:#e2a087; --group-ink:#814936; }
+.element-cell[data-group="noble"], .group-legend i[data-group="noble"] { --group-bg:#f5d9e4; --group-border:#d9a2b8; --group-ink:#7d425c; }
+.group-legend { max-width: 1180px; margin-left: auto; margin-right: auto; row-gap: 8px; }
+.group-legend i {
+  display: inline-block; width: 13px; height: 13px; border: 1px solid var(--group-border);
+  border-radius: 4px; background: var(--group-bg);
+}
+
 /* Shop */
 .tabs { max-width: 1180px; width: 100%; margin: 0 auto 14px; display: flex; gap: 8px; overflow-x: auto; }
 .tabs button { white-space: nowrap; }
@@ -336,6 +380,10 @@ select { border: 1px solid var(--line); background: #fff; border-radius: 10px; p
   .atom-logo { width: 130px; height: 130px; }
   .topbar { gap: 10px; }
   .wallet { font-size: 12px; padding: 9px; }
+  .table-tools { gap: 6px; }
+  .element-groups-toggle { padding: 7px 8px; font-size: 11px; }
+  .element-groups-toggle .toggle-track { width: 27px; }
+  .element-groups-toggle.active .toggle-track i { transform: translateX(9px); }
   .shop-grid { grid-template-columns: 1fr; padding-bottom: 230px; }
   .shop-tutorial { bottom: 132px; grid-template-columns: 1fr; }
   .record-summary { grid-template-columns: 1fr; }

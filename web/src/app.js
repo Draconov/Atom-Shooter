@@ -15,6 +15,7 @@ import {
   getAchievementProgress,
   evaluateAchievements,
   getElementMetadata,
+  getElementCategory,
   evaluateProgressionRewards,
   getProgressionRewardStatus,
 } from './progression.js';
@@ -48,6 +49,36 @@ let gameContext = null;
 let toastTimer = null;
 let tutorialTimer = null;
 let shopTutorialStep = 0;
+let elementGroupsVisible = false;
+
+const ELEMENT_GROUP_IDS = Object.freeze({
+  'Alkali metal': 'alkali',
+  'Alkaline earth metal': 'alkaline',
+  'Transition metal': 'transition',
+  Lanthanide: 'lanthanide',
+  Actinide: 'actinide',
+  'Post-transition metal': 'post-transition',
+  Metalloid: 'metalloid',
+  Nonmetal: 'nonmetal',
+  Halogen: 'halogen',
+  'Noble gas': 'noble',
+});
+
+function elementGroupId(z) {
+  return ELEMENT_GROUP_IDS[getElementCategory(z)] || 'post-transition';
+}
+
+function syncElementGroupView() {
+  const table = $('#periodic-table');
+  const toggle = $('#element-groups-toggle');
+  const stateLegend = $('#element-state-legend');
+  const groupLegend = $('#element-group-legend');
+  table?.classList.toggle('show-groups', elementGroupsVisible);
+  toggle?.classList.toggle('active', elementGroupsVisible);
+  toggle?.setAttribute('aria-pressed', String(elementGroupsVisible));
+  stateLegend?.classList.toggle('hidden', elementGroupsVisible);
+  groupLegend?.classList.toggle('hidden', !elementGroupsVisible);
+}
 
 const audio = new AudioSystem();
 audio.configure(save.settings);
@@ -186,6 +217,7 @@ function renderTable() {
     const summary = recordSummary(element.z);
 
     button.className = `element-cell ${done ? 'completed' : open ? 'available' : 'locked'} ${element.z === save.unlocked ? 'current' : ''}`;
+    button.dataset.group = elementGroupId(element.z);
     button.style.gridColumn = element.col;
     button.style.gridRow = element.row;
     button.disabled = !open;
@@ -198,6 +230,8 @@ function renderTable() {
     if (open) button.addEventListener('click', () => startGame(element.z - 1, 'classic'));
     root.appendChild(button);
   }
+
+  syncElementGroupView();
 }
 
 function prerequisiteName(tab, item) {
@@ -1056,6 +1090,11 @@ $$('#shop-tabs button').forEach((button) => button.addEventListener('click', () 
   shopTab = button.dataset.tab;
   renderShop();
 }));
+
+$('#element-groups-toggle')?.addEventListener('click', () => {
+  elementGroupsVisible = !elementGroupsVisible;
+  syncElementGroupView();
+});
 
 for (const id of ['setting-sfx-volume', 'setting-music-volume', 'setting-side', 'setting-stick', 'setting-deadzone', 'setting-control', 'setting-effects']) {
   $(`#${id}`).addEventListener('input', saveSettings);

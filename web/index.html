@@ -53,12 +53,29 @@
       <header class="topbar">
         <button class="icon-btn" data-action="home" aria-label="Back to menu">←</button>
         <div><p class="eyebrow">CLASSIC</p><h2>Choose Element</h2></div>
-        <button class="wallet" data-action="shop"><span class="e-dot"></span><b id="table-electrons">0</b><span class="n-dot"></span><b id="table-neutrons">0</b></button>
+        <div class="table-tools">
+          <button id="element-groups-toggle" class="element-groups-toggle" type="button" aria-pressed="false" title="Color elements by chemical group">
+            <span class="toggle-track" aria-hidden="true"><i></i></span><span>Groups</span>
+          </button>
+          <button class="wallet" data-action="shop"><span class="e-dot"></span><b id="table-electrons">0</b><span class="n-dot"></span><b id="table-neutrons">0</b></button>
+        </div>
       </header>
       <div class="table-wrap">
         <div id="periodic-table" class="periodic-table" aria-label="Periodic table level selector"></div>
       </div>
-      <div class="legend"><span><i class="state-dot done"></i>Completed</span><span><i class="state-dot open"></i>Available</span><span><i class="state-dot locked"></i>Locked</span></div>
+      <div id="element-state-legend" class="legend"><span><i class="state-dot done"></i>Completed</span><span><i class="state-dot open"></i>Available</span><span><i class="state-dot locked"></i>Locked</span></div>
+      <div id="element-group-legend" class="legend group-legend hidden" aria-label="Element groups">
+        <span><i data-group="alkali"></i>Alkali</span>
+        <span><i data-group="alkaline"></i>Alkaline earth</span>
+        <span><i data-group="transition"></i>Transition</span>
+        <span><i data-group="lanthanide"></i>Lanthanide</span>
+        <span><i data-group="actinide"></i>Actinide</span>
+        <span><i data-group="post-transition"></i>Post-transition</span>
+        <span><i data-group="metalloid"></i>Metalloid</span>
+        <span><i data-group="nonmetal"></i>Nonmetal</span>
+        <span><i data-group="halogen"></i>Halogen</span>
+        <span><i data-group="noble"></i>Noble gas</span>
+      </div>
     </section>
 
     <section id="screen-shop" class="screen" data-screen="shop">
