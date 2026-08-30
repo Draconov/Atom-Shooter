@@ -1,0 +1,1017 @@
+/* Phone layout pass. Loaded after styles.css so desktop behavior stays intact. */
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+}
+
+button,
+select,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+.game-screen,
+.game-stage,
+.touch-controls,
+.joystick,
+.fire-control,
+.dpad-control {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@supports (height: 100dvh) {
+  body,
+  .app-shell,
+  .screen {
+    min-height: 100dvh;
+  }
+}
+
+/* Coarse pointers should get full-strength controls rather than the desktop ghosted controls. */
+@media (pointer: coarse) {
+  button,
+  select {
+    min-height: 48px;
+  }
+
+  .touch-controls {
+    opacity: 1;
+  }
+
+  .joystick,
+  .fire-control,
+  .dpad-control {
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+  }
+
+  .joystick {
+    background: rgba(255,255,255,.34);
+    border-color: rgba(69,91,99,.3);
+  }
+
+  .joystick-knob {
+    background: rgba(52,67,74,.4);
+    border-color: rgba(255,255,255,.85);
+  }
+
+  .fire-control {
+    background: rgba(239,53,93,.16);
+    border-color: rgba(239,53,93,.46);
+  }
+}
+
+/* General phone UI */
+@media (max-width: 700px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .screen:not(.game-screen) {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  h1 {
+    font-size: clamp(30px, 10vw, 44px);
+    letter-spacing: .15em;
+  }
+
+  h2 {
+    font-size: clamp(22px, 7vw, 30px);
+  }
+
+  .tagline {
+    margin-bottom: 18px;
+    font-size: 15px;
+  }
+
+  .hero-card {
+    width: 100%;
+    max-width: 480px;
+    padding: 8px 4px 16px;
+  }
+
+  .atom-logo {
+    width: clamp(92px, 29vw, 126px);
+    height: clamp(92px, 29vw, 126px);
+    margin-bottom: 8px;
+  }
+
+  .main-actions {
+    gap: 8px;
+  }
+
+  .main-actions button,
+  .secondary-actions button {
+    min-height: 50px;
+  }
+
+  .secondary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .secondary-actions button {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 10px;
+    font-size: 13px;
+  }
+
+  .topbar {
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .topbar .icon-btn {
+    width: 46px;
+    height: 46px;
+  }
+
+  .topbar h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar .eyebrow {
+    font-size: 9px;
+  }
+
+  .table-tools {
+    gap: 5px;
+  }
+
+  .element-groups-toggle {
+    min-height: 42px;
+  }
+
+  .wallet {
+    min-height: 42px;
+    border-radius: 14px;
+    padding: 7px 9px;
+  }
+
+  /* Keep all 18 columns usable, but reduce the swipe distance substantially. */
+  .table-wrap {
+    width: auto;
+    max-width: none;
+    margin-right: calc(-1 * max(12px, env(safe-area-inset-right)));
+    margin-left: calc(-1 * max(12px, env(safe-area-inset-left)));
+    padding: 2px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x pan-y;
+  }
+
+  .periodic-table {
+    min-width: 690px;
+    grid-template-columns: repeat(18, 34px);
+    grid-template-rows: repeat(9, 46px);
+    gap: 4px;
+    justify-content: start;
+  }
+
+  .element-cell {
+    padding: 3px 2px;
+    border-radius: 7px;
+  }
+
+  .element-cell .z {
+    font-size: 7px;
+  }
+
+  .element-cell .sym {
+    font-size: 16px;
+  }
+
+  .element-cell .nm {
+    display: none;
+  }
+
+  .challenge-medals {
+    right: 2px;
+    bottom: 1px;
+    font-size: 5px;
+  }
+
+  .legend {
+    gap: 10px 14px;
+    font-size: 11px;
+  }
+
+  .group-legend {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 4px 2px 8px;
+    scrollbar-width: thin;
+  }
+
+  .group-legend > span {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .tabs {
+    gap: 6px;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .tabs button {
+    min-height: 44px;
+    padding: 9px 14px;
+  }
+
+  .shop-grid {
+    gap: 10px;
+    padding-bottom: 210px;
+  }
+
+  .item-card {
+    padding: 13px;
+    border-radius: 15px;
+  }
+
+  .shop-item-preview {
+    min-height: 108px;
+  }
+
+  .loadout-panel {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100% - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right)));
+    max-height: 180px;
+    padding: 10px 12px;
+    gap: 8px;
+    border-radius: 15px;
+    overflow-y: auto;
+  }
+
+  .loadout-panel .slots {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .loadout-panel .slot {
+    flex: 0 0 auto;
+  }
+
+  .shop-tutorial {
+    bottom: calc(118px + env(safe-area-inset-bottom));
+  }
+
+  .record-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .record-summary article,
+  .records-card {
+    padding: 12px;
+    border-radius: 15px;
+  }
+
+  .record-summary b {
+    font-size: 18px;
+  }
+
+  .record-summary small {
+    font-size: 8px;
+  }
+
+  .records-scroll {
+    margin-inline: -4px;
+    padding-bottom: 4px;
+    overscroll-behavior-x: contain;
+  }
+
+  .settings-card {
+    margin: 0 auto;
+    padding: 4px 14px;
+    border-radius: 17px;
+  }
+
+  .setting-row,
+  .setting-row.select-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 14px 0;
+  }
+
+  .setting-row.select-row select,
+  .setting-row input[type=range],
+  .volume-control input[type=range] {
+    width: 100%;
+    max-width: none;
+  }
+
+  .volume-control {
+    width: 100%;
+  }
+
+  .volume-control input[type=range] {
+    flex: 1 1 auto;
+  }
+
+  .settings-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .achievement-card,
+  .codex-card {
+    border-radius: 15px;
+  }
+
+  .modal {
+    align-items: center;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+
+  .modal-card {
+    max-height: calc(100dvh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+    overflow-y: auto;
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+
+  .pause-modal .modal-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pause-modal .modal-actions .pause-controls {
+    grid-column: 1 / -1;
+  }
+
+  .toast {
+    bottom: max(14px, calc(env(safe-area-inset-bottom) + 8px));
+    max-width: calc(100% - 24px);
+  }
+
+  /* Phone gameplay shell */
+  .game-screen.active {
+    width: 100%;
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  @supports (height: 100dvh) {
+    .game-screen.active {
+      height: 100dvh;
+    }
+  }
+
+  .game-topbar {
+    height: calc(52px + env(safe-area-inset-top));
+    padding: calc(5px + env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 5px max(8px, env(safe-area-inset-left));
+    gap: 5px;
+  }
+
+  .game-bottom {
+    height: calc(50px + env(safe-area-inset-bottom));
+    padding: 5px max(10px, env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    gap: 6px;
+  }
+
+  .game-topbar .icon-btn {
+    width: 42px;
+    height: 42px;
+    min-height: 42px;
+    flex: 0 0 42px;
+  }
+
+  .lives {
+    min-width: 0;
+    max-width: 92px;
+    overflow: hidden;
+  }
+
+  .life-ship {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+
+  .life-count {
+    font-size: 11px;
+  }
+
+  .weapon-energy {
+    grid-template-columns: minmax(54px, 18vw) auto;
+    min-width: 0;
+    gap: 4px;
+    font-size: 9px;
+  }
+
+  .weapon-energy > span {
+    display: none;
+  }
+
+  .energy-track {
+    width: 18vw;
+    min-width: 54px;
+    max-width: 92px;
+    height: 8px;
+  }
+
+  .game-wallet {
+    flex: 0 0 auto;
+    gap: 3px;
+    font-size: 10px;
+  }
+
+  .game-wallet .e-dot,
+  .game-wallet .n-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .game-stage {
+    isolation: isolate;
+  }
+
+  .objective {
+    max-width: calc(100% - 20px);
+    padding: 6px 10px;
+    font-size: 9px;
+  }
+
+  .powerup-timers {
+    gap: 4px;
+  }
+
+  .powerup-chip {
+    padding: 3px 6px;
+    font-size: 8px;
+  }
+
+  .powerup-chip b {
+    width: 15px;
+    height: 15px;
+  }
+
+  .element-symbol {
+    width: 32px;
+    height: 32px;
+    margin-right: 7px;
+    font-size: 14px;
+  }
+
+  #element-name {
+    display: block;
+    max-width: 34vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .score-block {
+    min-width: 0;
+  }
+
+  .score-block #score {
+    font-size: 15px;
+  }
+
+  .touch-controls {
+    z-index: 5;
+  }
+
+  .joystick,
+  .fire-control,
+  .dpad-control {
+    bottom: 12px;
+  }
+
+  .joystick {
+    width: 124px;
+    height: 124px;
+  }
+
+  .joystick-knob {
+    width: 48px;
+    height: 48px;
+  }
+
+  .stick-small .joystick {
+    width: 104px;
+    height: 104px;
+  }
+
+  .stick-large .joystick {
+    width: 142px;
+    height: 142px;
+  }
+
+  .flight-stick,
+  .aim-stick {
+    right: max(14px, env(safe-area-inset-right));
+  }
+
+  .fire-control {
+    left: max(16px, env(safe-area-inset-left));
+    width: 88px;
+    height: 88px;
+    min-height: 0;
+  }
+
+  .mode-combined.controls-left .flight-stick {
+    left: max(14px, env(safe-area-inset-left));
+    right: auto;
+  }
+
+  .mode-combined.controls-left .fire-control {
+    right: max(16px, env(safe-area-inset-right));
+    left: auto;
+  }
+
+  .mode-split .flight-stick {
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+  }
+
+  .mode-split .aim-stick {
+    right: max(12px, env(safe-area-inset-right));
+    left: auto;
+  }
+
+  .mode-split.controls-left .flight-stick {
+    right: max(12px, env(safe-area-inset-right));
+    left: auto;
+  }
+
+  .mode-split.controls-left .aim-stick {
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+  }
+
+  .mode-split .fire-control {
+    width: 64px;
+    height: 64px;
+    bottom: 8px;
+  }
+
+  .dpad-control {
+    left: max(14px, env(safe-area-inset-left));
+    width: 126px;
+    height: 126px;
+  }
+
+  .dpad-control button {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    border-radius: 12px;
+  }
+
+  .dpad-up,
+  .dpad-down {
+    left: 41px;
+  }
+
+  .dpad-left,
+  .dpad-right {
+    top: 41px;
+  }
+
+  .mode-dpad .fire-control {
+    right: max(16px, env(safe-area-inset-right));
+    left: auto;
+  }
+
+  .mode-dpad.controls-left .dpad-control {
+    right: max(14px, env(safe-area-inset-right));
+    left: auto;
+  }
+
+  .mode-dpad.controls-left .fire-control {
+    left: max(16px, env(safe-area-inset-left));
+    right: auto;
+  }
+}
+
+/* Portrait: battlefield occupies the top square; the extra tall-screen area becomes a control deck. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .game-stage {
+    display: grid;
+    place-items: start center;
+  }
+
+  .game-stage #game-canvas {
+    width: 100%;
+    height: auto;
+    max-height: none;
+  }
+
+  .tutorial-callout {
+    top: min(calc(100vw - 64px), calc(100% - 102px));
+    bottom: auto;
+    width: calc(100% - 20px);
+    padding: 9px 11px;
+    font-size: 10px;
+  }
+
+  .element-behavior {
+    top: 38px;
+  }
+
+  .marathon-modifier {
+    top: 38px;
+  }
+
+  .challenge-panel {
+    top: 72px;
+  }
+}
+
+/* Very short portrait phones: keep controls usable instead of letting them collide with the battlefield. */
+@media (max-width: 700px) and (orientation: portrait) and (max-height: 690px) {
+  .game-topbar {
+    height: calc(46px + env(safe-area-inset-top));
+  }
+
+  .game-bottom {
+    height: calc(44px + env(safe-area-inset-bottom));
+  }
+
+  .joystick {
+    width: 108px;
+    height: 108px;
+  }
+
+  .stick-small .joystick {
+    width: 92px;
+    height: 92px;
+  }
+
+  .stick-large .joystick {
+    width: 120px;
+    height: 120px;
+  }
+
+  .joystick-knob {
+    width: 42px;
+    height: 42px;
+  }
+
+  .fire-control {
+    width: 76px;
+    height: 76px;
+  }
+
+  .mode-split .fire-control {
+    width: 56px;
+    height: 56px;
+  }
+
+  .dpad-control {
+    width: 112px;
+    height: 112px;
+  }
+
+  .dpad-control button {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .dpad-up,
+  .dpad-down {
+    left: 36px;
+  }
+
+  .dpad-left,
+  .dpad-right {
+    top: 36px;
+  }
+}
+
+/* Landscape phones: use the side gutters for controls and let the square battlefield use full height. */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+  .game-screen.active {
+    position: relative;
+    height: 100vh;
+    min-height: 0;
+  }
+
+  @supports (height: 100dvh) {
+    .game-screen.active {
+      height: 100dvh;
+    }
+  }
+
+  .game-topbar,
+  .game-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 8;
+    height: 44px;
+    border-color: rgba(180,196,201,.72);
+    background: rgba(247,250,251,.84);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .game-topbar {
+    top: 0;
+    padding: 4px max(10px, env(safe-area-inset-right)) 4px max(10px, env(safe-area-inset-left));
+  }
+
+  .game-bottom {
+    bottom: 0;
+    padding: 4px max(10px, env(safe-area-inset-right)) 4px max(10px, env(safe-area-inset-left));
+  }
+
+  .game-stage {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    place-items: center;
+  }
+
+  .game-stage #game-canvas {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .objective {
+    top: 48px;
+    max-width: min(52vw, 420px);
+  }
+
+  .powerup-timers {
+    top: 76px;
+    max-width: min(52vw, 420px);
+  }
+
+  .element-behavior {
+    top: 48px;
+    left: max(8px, env(safe-area-inset-left));
+    max-width: 21vw;
+  }
+
+  .marathon-modifier {
+    top: 48px;
+    right: max(8px, env(safe-area-inset-right));
+    max-width: 21vw;
+  }
+
+  .challenge-panel {
+    top: 78px;
+    left: max(8px, env(safe-area-inset-left));
+    width: min(180px, 23vw);
+  }
+
+  .tutorial-callout {
+    bottom: 49px;
+    width: min(420px, 48vw);
+    padding: 8px 10px;
+    font-size: 9px;
+  }
+
+  .joystick,
+  .fire-control,
+  .dpad-control {
+    bottom: max(50px, calc(env(safe-area-inset-bottom) + 46px));
+  }
+
+  .joystick {
+    width: 96px;
+    height: 96px;
+  }
+
+  .stick-small .joystick {
+    width: 84px;
+    height: 84px;
+  }
+
+  .stick-large .joystick {
+    width: 108px;
+    height: 108px;
+  }
+
+  .joystick-knob {
+    width: 38px;
+    height: 38px;
+  }
+
+  .flight-stick,
+  .aim-stick {
+    right: max(18px, calc(env(safe-area-inset-right) + 8px));
+  }
+
+  .fire-control {
+    left: max(18px, calc(env(safe-area-inset-left) + 8px));
+    width: 76px;
+    height: 76px;
+  }
+
+  .mode-combined.controls-left .flight-stick {
+    left: max(18px, calc(env(safe-area-inset-left) + 8px));
+    right: auto;
+  }
+
+  .mode-combined.controls-left .fire-control {
+    right: max(18px, calc(env(safe-area-inset-right) + 8px));
+    left: auto;
+  }
+
+  .mode-split .flight-stick {
+    left: max(18px, calc(env(safe-area-inset-left) + 8px));
+    right: auto;
+  }
+
+  .mode-split .aim-stick {
+    right: max(18px, calc(env(safe-area-inset-right) + 8px));
+    left: auto;
+  }
+
+  .mode-split.controls-left .flight-stick {
+    right: max(18px, calc(env(safe-area-inset-right) + 8px));
+    left: auto;
+  }
+
+  .mode-split.controls-left .aim-stick {
+    left: max(18px, calc(env(safe-area-inset-left) + 8px));
+    right: auto;
+  }
+
+  .mode-split .fire-control {
+    bottom: 50px;
+    width: 58px;
+    height: 58px;
+  }
+
+  .dpad-control {
+    left: max(18px, calc(env(safe-area-inset-left) + 8px));
+    width: 104px;
+    height: 104px;
+  }
+
+  .dpad-control button {
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+    font-size: 12px;
+  }
+
+  .dpad-up,
+  .dpad-down {
+    left: 33px;
+  }
+
+  .dpad-left,
+  .dpad-right {
+    top: 33px;
+  }
+
+  .mode-dpad .fire-control {
+    right: max(18px, calc(env(safe-area-inset-right) + 8px));
+    left: auto;
+  }
+
+  .mode-dpad.controls-left .dpad-control {
+    right: max(18px, calc(env(safe-area-inset-right) + 8px));
+    left: auto;
+  }
+
+  .mode-dpad.controls-left .fire-control {
+    left: max(18px, calc(env(safe-area-inset-left) + 8px));
+    right: auto;
+  }
+}
+
+/* Tiny-width phones: prevent secondary UI from forcing horizontal overflow. */
+@media (max-width: 380px) {
+  .secondary-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .topbar {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .element-groups-toggle > span:last-child {
+    display: none;
+  }
+
+  .element-groups-toggle {
+    width: 44px;
+    justify-content: center;
+    padding-inline: 7px;
+  }
+
+  .game-wallet {
+    font-size: 9px;
+  }
+
+  .weapon-energy {
+    grid-template-columns: 52px auto;
+  }
+
+  .game-bottom {
+    font-size: 11px;
+  }
+}
+
+/* Two-scheme mobile controls: movement + shooting stick, or D-pad + shooting stick. */
+.touch-controls > #fire-control {
+  display: none !important;
+}
+
+.mode-dpad .flight-stick {
+  display: none !important;
+}
+
+.mode-dpad .aim-stick {
+  display: grid !important;
+  right: 28px;
+  left: auto;
+}
+
+.mode-dpad.controls-left .aim-stick {
+  left: 28px;
+  right: auto;
+}
+
+.shoot-stick {
+  border-color: rgba(239, 53, 93, .42);
+  background: rgba(239, 53, 93, .08);
+}
+
+.shoot-stick::after {
+  content: "SHOOT";
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  color: rgba(189, 49, 80, .72);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  pointer-events: none;
+}
+
+@media (max-width: 700px) {
+  .mode-dpad .aim-stick {
+    right: max(12px, env(safe-area-inset-right));
+    left: auto;
+  }
+
+  .mode-dpad.controls-left .aim-stick {
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .mode-dpad .aim-stick {
+    right: max(18px, calc(env(safe-area-inset-right) + 8px));
+    left: auto;
+  }
+
+  .mode-dpad.controls-left .aim-stick {
+    left: max(18px, calc(env(safe-area-inset-left) + 8px));
+    right: auto;
+  }
+}

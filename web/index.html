@@ -5,12 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#eef3f5" />
   <meta name="description" content="Atom Shooter — strip electrons, split nuclei and upgrade your nano ship across all 118 elements." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>Atom Shooter</title>
   <link rel="icon" href="./assets/atom-shooter-favicon.ico?v=120-flat" sizes="any" />
   <link rel="icon" href="./assets/atom-shooter-icon-192.png?v=120-flat" sizes="192x192" type="image/png" />
   <link rel="apple-touch-icon" href="./assets/atom-shooter-icon-192.png?v=120-flat" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./mobile.css" />
 </head>
 <body>
   <main id="app" class="app-shell" aria-live="polite">
@@ -23,7 +27,6 @@
         <p id="loading-label" class="tiny muted">Loading systems… 0%</p>
       </div>
     </section>
-
     <section id="screen-main" class="screen" data-screen="main">
       <div class="menu-card hero-card">
         <div class="atom-logo" aria-hidden="true">
@@ -48,7 +51,6 @@
         <p id="continue-hint" class="tiny muted"></p>
       </div>
     </section>
-
     <section id="screen-table" class="screen" data-screen="table">
       <header class="topbar">
         <button class="icon-btn" data-action="home" aria-label="Back to menu">←</button>
@@ -77,7 +79,6 @@
         <span><i data-group="noble"></i>Noble gas</span>
       </div>
     </section>
-
     <section id="screen-shop" class="screen" data-screen="shop">
       <header class="topbar">
         <button class="icon-btn" data-action="shop-back" aria-label="Back">←</button>
@@ -95,7 +96,6 @@
       <div id="shop-tutorial" class="shop-tutorial hidden" role="status"></div>
       <aside id="loadout-panel" class="loadout-panel"></aside>
     </section>
-
     <section id="screen-records" class="screen" data-screen="records">
       <header class="topbar">
         <button class="icon-btn" data-action="home" aria-label="Back">←</button>
@@ -103,7 +103,6 @@
       </header>
       <div id="records-content" class="records-content"></div>
     </section>
-
     <section id="screen-achievements" class="screen" data-screen="achievements">
       <header class="topbar">
         <button class="icon-btn" data-action="home" aria-label="Back">←</button>
@@ -111,7 +110,6 @@
       </header>
       <div id="achievements-content" class="achievement-grid"></div>
     </section>
-
     <section id="screen-codex" class="screen" data-screen="codex">
       <header class="topbar">
         <button class="icon-btn" data-action="home" aria-label="Back">←</button>
@@ -119,7 +117,6 @@
       </header>
       <div id="codex-content" class="codex-grid"></div>
     </section>
-
     <section id="screen-options" class="screen" data-screen="options">
       <header class="topbar">
         <button class="icon-btn" data-action="home" aria-label="Back">←</button>
@@ -128,7 +125,7 @@
       <div class="settings-card">
         <label class="setting-row volume-row"><span><b>Sound effects volume</b></span><span class="volume-control"><input id="setting-sfx-volume" type="range" min="0" max="100" step="1" /><output id="setting-sfx-volume-value" for="setting-sfx-volume">100%</output></span></label>
         <label class="setting-row volume-row"><span><b>Music volume</b></span><span class="volume-control"><input id="setting-music-volume" type="range" min="0" max="100" step="1" /><output id="setting-music-volume-value" for="setting-music-volume">100%</output></span></label>
-        <label class="setting-row select-row"><span><b>Control mode</b></span><select id="setting-control"><option value="combined">Shoot + Fly&amp;Aim</option><option value="split">Fly + Shoot + Aim</option><option value="dpad">D-pad</option></select></label>
+        <label class="setting-row select-row"><span><b>Control mode</b></span><select id="setting-control"><option value="split">Joystick + Shooting Joystick</option><option value="dpad">D-pad + Shooting Joystick</option></select></label>
         <label class="setting-row select-row"><span><b>Control side</b></span><select id="setting-side"><option value="right">Right</option><option value="left">Left</option></select></label>
         <label class="setting-row select-row"><span><b>Joystick size</b></span><select id="setting-stick"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
         <label class="setting-row select-row"><span><b>Screen effects</b></span><select id="setting-effects"><option value="full">Full</option><option value="reduced">Reduced</option><option value="off">Off</option></select></label>
@@ -136,7 +133,6 @@
         <div class="settings-buttons"><button data-action="reset-tutorial">Reset tutorial</button><button class="danger" data-action="reset-save">Reset all progress</button></div>
       </div>
     </section>
-
     <section id="screen-game" class="screen game-screen" data-screen="game">
       <div class="game-topbar">
         <button id="pause-btn" class="icon-btn light" aria-label="Pause">Ⅱ</button>
@@ -156,10 +152,10 @@
         <aside id="challenge-panel" class="challenge-panel hidden" aria-live="polite"></aside>
         <div id="powerup-timers" class="powerup-timers" aria-live="polite"></div>
         <div id="tutorial-callout" class="tutorial-callout hidden"></div>
-        <div id="touch-controls" class="touch-controls mode-combined" aria-label="Touch controls">
-          <div id="fire-control" class="fire-control"><span>FIRE</span></div>
-          <div id="joystick" class="joystick flight-stick" aria-label="Flight control"><div id="joystick-knob" class="joystick-knob"></div></div>
-          <div id="aim-joystick" class="joystick aim-stick" aria-label="Aim control"><div id="aim-joystick-knob" class="joystick-knob"></div></div>
+        <div id="touch-controls" class="touch-controls mode-split" aria-label="Touch controls">
+          <div id="fire-control" class="fire-control legacy-fire-control" aria-hidden="true"><span>FIRE</span></div>
+          <div id="joystick" class="joystick flight-stick" aria-label="Movement joystick"><div id="joystick-knob" class="joystick-knob"></div></div>
+          <div id="aim-joystick" class="joystick aim-stick shoot-stick" aria-label="Shooting joystick"><div id="aim-joystick-knob" class="joystick-knob"></div></div>
           <div id="dpad-control" class="dpad-control" aria-label="D-pad">
             <button class="dpad-up" data-dpad="up" aria-label="Thrust">▲</button>
             <button class="dpad-left" data-dpad="left" aria-label="Turn left">◀</button>
@@ -173,12 +169,11 @@
         <div class="score-block"><b id="score">0</b><small>SCORE</small><span id="marathon-next" class="marathon-next hidden"></span></div>
       </div>
     </section>
-
     <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-card"><h2 id="modal-title"></h2><div id="modal-body"></div><div id="modal-actions" class="modal-actions"></div></div>
     </div>
     <div id="toast" class="toast hidden" role="status"></div>
   </main>
-  <script type="module" src="./src/app.js"></script>
+  <script type="module" src="./src/mobile-controls.js"></script>
 </body>
 </html>
