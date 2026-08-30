@@ -10,7 +10,7 @@ import {
   getElectronShellCounts,
   getMarathonThresholds,
 } from '../web/src/data.js';
-import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon, CORE_EXCLUSION_RADIUS, isShipInsideCore, isCoreLethalPhase, getNucleusDamageStage } from '../web/src/game.js';
+import { getCollectionWindow, getCollectionResolution, getWeaponEnergyFraction, canFireWeapon, CORE_EXCLUSION_RADIUS, getCoreDangerRadius, isShipInsideCore, isCoreLethalPhase, getNucleusDamageStage } from '../web/src/game.js';
 import { AudioSystem, MUSIC_TRACKS } from '../web/src/audio.js';
 import { DEFAULT_SAVE, SAVE_SCHEMA, loadSave, normalizeSave, normalizeMarathonState } from '../web/src/save.js';
 import {
@@ -128,10 +128,12 @@ assert(!canFireWeapon({ activeBullets: 47, volleySize: 4, bulletLimit: 48, energ
 assert(!canFireWeapon({ activeBullets: 0, volleySize: 2, bulletLimit: 48, energy: 4, cost: 5 }), 'A weapon must not fire without enough energy');
 assert(!canFireWeapon({ activeBullets: 0, volleySize: 2, bulletLimit: 48, energy: 40, cost: 5, cooldown: 0.01 }), 'A weapon must respect pulse cooldown');
 
-assert(CORE_EXCLUSION_RADIUS === 86, 'The core death boundary must match the innermost 86px electron orbit');
-assert(isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS, r: 13 }), 'A ship hull crossing the inner orbit must be inside the lethal core zone');
-assert(!isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS + 13, r: 13 }), 'A ship whose hull only touches the inner orbit must remain safe');
-assert(!isShipInsideCore({ x: 500, y: 500 + CORE_EXCLUSION_RADIUS + 40, r: 13 }), 'A ship outside the inner orbit must remain safe');
+assert(CORE_EXCLUSION_RADIUS === getCoreDangerRadius(1), 'Default core boundary must match Hydrogen red warning ring');
+assert(getCoreDangerRadius(1) < 86 && getCoreDangerRadius(118) < 86, 'The lethal red core ring must stay inside the first 86px electron orbit for every element');
+const hydrogenCoreRadius = getCoreDangerRadius(1);
+assert(isShipInsideCore({ x: 500, y: 500 + hydrogenCoreRadius + 12, r: 13 }, hydrogenCoreRadius), 'A ship hull crossing the red core ring must enter the lethal zone');
+assert(!isShipInsideCore({ x: 500, y: 500 + hydrogenCoreRadius + 13, r: 13 }, hydrogenCoreRadius), 'A ship whose hull only touches the red core ring must remain safe');
+assert(!isShipInsideCore({ x: 500, y: 500 + 86, r: 13 }, hydrogenCoreRadius), 'Crossing the first electron orbit must not trigger core death');
 assert(isCoreLethalPhase('electrons'), 'The core must remain lethal during the electron phase');
 assert(isCoreLethalPhase('unstable'), 'The core must remain lethal during nucleus instability');
 assert(!isCoreLethalPhase('post'), 'The exploded core area must be safe during collection');
@@ -286,7 +288,7 @@ assert(appSource.includes('function applyChallengeRewards(result)'), 'Classic co
 
 const gameSource = fs.readFileSync('web/src/game.js', 'utf8');
 assert(gameSource.includes('if (isCoreLethalPhase(this.phase))'), 'Core death must be disabled after the nucleus explodes');
-assert(gameSource.includes("damageShip('core', { bypassProtection: true })"), 'Crossing the inner orbit before explosion must cause unavoidable core death');
+assert(gameSource.includes("damageShip('core', { bypassProtection: true })"), 'Crossing the red core ring before explosion must cause unavoidable core death');
 assert(gameSource.includes('getElementBehavior'), 'Game must apply element-specific behavior profiles');
 assert(gameSource.includes('updateHazards(dt)'), 'Game must simulate radioactive/Marathon proton hazards');
 assert(gameSource.includes('challengeStates(true)'), 'Game completion must evaluate optional challenge outcomes');

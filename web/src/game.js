@@ -55,13 +55,18 @@ export function canFireWeapon({ activeBullets, volleySize, bulletLimit, energy, 
     && energy + 1e-6 >= cost;
 }
 
-// The first electron shell is the visible inner safety boundary around the
-// nucleus. The ship hull may touch it, but crossing inside destroys the ship.
-export const CORE_EXCLUSION_RADIUS = 86;
+// The lethal core boundary is the red warning ring around the nucleus, not
+// the first electron orbit. Its size follows the visible nucleus as elements
+// get heavier, while always staying well inside the 86px first shell.
+export function getCoreDangerRadius(atomicNumber = 1) {
+  const z = clamp(Math.round(Number(atomicNumber) || 1), 1, 118);
+  return 28 + Math.sqrt(z) * 2.4 + 11;
+}
+export const CORE_EXCLUSION_RADIUS = getCoreDangerRadius(1);
 
 export function isShipInsideCore({ x, y, r = 0 }, coreRadius = CORE_EXCLUSION_RADIUS) {
   const distance = Math.hypot(Number(x) - 500, Number(y) - 500);
-  return distance < Math.max(0, Number(coreRadius) || CORE_EXCLUSION_RADIUS) + Math.max(0, Number(r) || 0);
+  return distance + 1e-6 < Math.max(0, Number(coreRadius) || CORE_EXCLUSION_RADIUS) + Math.max(0, Number(r) || 0);
 }
 
 export function isCoreLethalPhase(phase) {
@@ -805,12 +810,12 @@ export class AtomGame {
       }
     }
 
-    // The innermost visible orbit is lethal only while the nucleus still
-    // exists. Once the core explodes and collection begins, its former area
-    // becomes safe to fly through. Before that, the boundary bypasses Ghost
-    // and temporary spawn invulnerability.
+    // Only the red warning ring around the nucleus is lethal. Electron orbits
+    // are safe to cross. Once the core explodes and collection begins, even the
+    // center becomes safe. Before that, this boundary bypasses Ghost and spawn
+    // invulnerability.
     if (isCoreLethalPhase(this.phase)) {
-      const coreRadius = this.shellRadii[0] || CORE_EXCLUSION_RADIUS;
+      const coreRadius = getCoreDangerRadius(this.element.z);
       if (isShipInsideCore(ship, coreRadius)) this.damageShip('core', { bypassProtection: true });
     }
   }
@@ -1479,6 +1484,7 @@ export class AtomGame {
 
     if (this.phase !== 'post') {
       const radius = 28 + Math.sqrt(this.element.z) * 2.4;
+      const coreDangerRadius = getCoreDangerRadius(this.element.z);
       const blobs = clamp(Math.round(Math.sqrt(this.element.z) * 2), 4, 20);
       const stage = getNucleusDamageStage({ orbiting:this.orbitingRemaining, total:this.electrons.length, phase:this.phase });
       const stageLevel = stage === 'intact' ? 0 : stage === 'cracked' ? 1 : stage === 'heavily-cracked' ? 2 : 3;
@@ -1500,7 +1506,7 @@ export class AtomGame {
       c.fill();
 
       c.beginPath();
-      c.arc(500, 500, radius + 11 + Math.sin(this.elapsed * 4.2) * 1.8, 0, TAU);
+      c.arc(500, 500, coreDangerRadius, 0, TAU);
       c.strokeStyle = `rgba(239,53,93,${.32 + warningPulse * .17 + stageLevel * .045})`;
       c.lineWidth = 4.5 + stageLevel * .35;
       c.stroke();
