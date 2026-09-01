@@ -13,23 +13,31 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-
 import androidx.webkit.WebViewAssetLoader;
 
 public final class MainActivity extends Activity {
     private static final String APP_HOST = "appassets.androidplatform.net";
     private static final String START_URL = "https://" + APP_HOST + "/assets/index.html";
+    private static final String ANDROID_UI_BOOTSTRAP =
+        "(function(){"
+        + "document.documentElement.classList.add('android-native');"
+        + "if(document.body)document.body.classList.add('android-native');"
+        + "if(document.getElementById('android-native-css'))return;"
+        + "var link=document.createElement('link');"
+        + "link.id='android-native-css';"
+        + "link.rel='stylesheet';"
+        + "link.href='./android.css';"
+        + "document.head.appendChild(link);"
+        + "})();";
 
     private WebView webView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
             .build();
-
         webView = new WebView(this);
         webView.setBackgroundColor(Color.rgb(238, 243, 245));
         webView.setLayoutParams(new ViewGroup.LayoutParams(
@@ -45,7 +53,6 @@ public final class MainActivity extends Activity {
             );
             return insets;
         });
-
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -58,7 +65,6 @@ public final class MainActivity extends Activity {
         settings.setUseWideViewPort(true);
         settings.setMediaPlaybackRequiresUserGesture(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -67,10 +73,17 @@ public final class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (url != null && url.startsWith("https://" + APP_HOST + "/assets/")) {
+                    view.evaluateJavascript(ANDROID_UI_BOOTSTRAP, null);
+                }
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 if (APP_HOST.equals(uri.getHost())) return false;
-
                 String scheme = uri.getScheme();
                 if ("http".equals(scheme) || "https".equals(scheme)) {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
